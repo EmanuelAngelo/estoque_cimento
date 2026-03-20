@@ -1,0 +1,20 @@
+@layer vuetify-overrides {
+  code, pre, .v-code {
+    font-family: var(--font-mono);
+  }
+
+  /*
+    Fix: em alguns setups (Vuetify + Tailwind preflight), o input interno do VSelect
+    pode ficar visível junto com o texto de seleção, duplicando o valor exibido.
+    O VSelect não precisa desse input visível (diferente do VAutocomplete).
+  */
+  .v-select .v-field__input > input {
+    opacity: 0;
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    position: absolute;
+  }
+}
