@@ -115,3 +115,59 @@ Dashboard e relatórios:
 
 - Banco default é **SQLite** (`db.sqlite3`) para facilitar o dev.
 - O frontend exibe loaders/spinners nas listas e mantém um tempo mínimo de 2s nas ações de salvar/excluir para feedback visual.
+
+## Rodar como aplicativo Windows (100% offline)
+
+Este projeto já tem um scaffold para rodar como **app instalado** no Windows usando:
+
+- **Django (local)** servido por **Waitress** via `desktop_backend.py`
+- **Electron** como shell/instalador (NSIS) em `desktop/`
+
+### 1) Build do Frontend (gerar `frontend/dist`)
+
+```bash
+cd /c/Users/u12512/Projetos/estoque_cimento/frontend
+npm install
+npm run build
+```
+
+### 2) Gerar o EXE do Backend (PyInstaller)
+
+O Electron espera encontrar o executável em `dist_backend/estoque-cimento-backend.exe`.
+
+```bash
+cd /c/Users/u12512/Projetos/estoque_cimento
+source venv/Scripts/activate
+
+pip install -r requirements.txt
+pip install pyinstaller
+
+pyinstaller --noconfirm --clean --onefile \
+	--name "estoque-cimento-backend" \
+	desktop_backend.py
+
+# Copia o exe para o local esperado pelo Electron
+mkdir -p dist_backend
+cp dist/estoque-cimento-backend.exe dist_backend/estoque-cimento-backend.exe
+```
+
+Notas:
+- O banco `db.sqlite3` será criado automaticamente em um diretório do usuário (configurado pelo Electron).
+- O backend faz `migrate` automaticamente no startup.
+
+### 3) Gerar o instalador (Electron + NSIS)
+
+```bash
+cd /c/Users/u12512/Projetos/estoque_cimento/desktop
+npm install
+npm run dist
+```
+
+Saída: `desktop/dist/` (vai conter o instalador `.exe` do NSIS).
+
+### Como o app funciona
+
+- Ao abrir o aplicativo:
+	- o Electron inicia o backend local em `127.0.0.1:8000`
+	- espera `GET /api/health/` responder
+	- abre a UI em `http://127.0.0.1:8000/` (SPA servida do `frontend/dist`)

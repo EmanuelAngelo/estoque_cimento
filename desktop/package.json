@@ -1,0 +1,54 @@
+{
+  "name": "estoque-cimento-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Desktop shell (Electron) for Estoque de Cimento",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron": "^36.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.estoquecimento.app",
+    "productName": "Estoque de Cimento",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist",
+        "to": "frontend_dist",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../dist_backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

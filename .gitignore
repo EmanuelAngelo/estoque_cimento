@@ -38,6 +38,14 @@ frontend/.vite/
 frontend/.cache/
 frontend/*.log
 
+# Desktop (Electron)
+desktop/node_modules/
+desktop/dist/
+desktop/*.log
+
+# Backend executable build (desktop)
+dist_backend/
+
 # Build artifacts
 *.egg-info/
 build/

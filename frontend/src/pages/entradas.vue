@@ -2,8 +2,8 @@
   <div class="max-w-7xl mx-auto">
     <PageHeader title="Entradas de estoque" description="Registro de recebimento de mercadoria">
       <template #actions>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog">Nova entrada</v-btn>
-        <v-btn variant="outlined" prepend-icon="mdi-refresh" @click="loadEntradas">Atualizar</v-btn>
+        <AppButton icon="mdi-plus" @click="openDialog">Nova entrada</AppButton>
+        <AppButton variant="outline" icon="mdi-refresh" @click="loadEntradas">Atualizar</AppButton>
       </template>
     </PageHeader>
 
@@ -15,9 +15,7 @@
         </div>
       </div>
 
-      <div v-if="loadingEntradas" class="p-10 flex items-center justify-center">
-        <v-progress-circular color="primary" indeterminate></v-progress-circular>
-      </div>
+      <AppSpinner v-if="loadingEntradas" />
 
       <div v-else class="overflow-x-auto">
         <table class="app-table">
@@ -73,69 +71,67 @@
       </div>
     </div>
 
-    <v-dialog v-model="dialogOpen" max-width="980">
-      <v-card class="overflow-hidden rounded-[var(--radius)]" elevation="0">
-        <div class="px-6 py-5 bg-card border-b border-border">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h2 class="text-lg font-semibold text-foreground">Nova entrada</h2>
-              <p class="text-sm text-muted-foreground mt-1">Preencha os dados do recebimento</p>
-            </div>
-            <v-btn icon="mdi-close" variant="text" @click="closeDialog" />
+    <AppModal
+      v-model="dialogOpen"
+      :title="isEditing ? 'Editar entrada' : 'Nova entrada'"
+      description="Preencha os dados do recebimento"
+      max-width="xl"
+    >
+      <form class="space-y-6" @submit.prevent="save">
+        <div class="grid gap-4 md:grid-cols-12">
+          <div class="md:col-span-6">
+            <AppSelect
+              v-model="form.produto_id"
+              :items="produtos"
+              item-title="label"
+              item-value="id"
+              label="Produto"
+              :disabled="isEditing"
+              icon="mdi-package-variant"
+            />
+          </div>
+          <div class="md:col-span-2">
+            <AppInput v-model="form.quantidade" label="Quantidade" type="number" :disabled="isEditing" min="1" />
+          </div>
+          <div class="md:col-span-2">
+            <AppInput
+              v-model="form.custo_unitario_fabrica"
+              label="Custo unit. (fábrica)"
+              type="number"
+              :disabled="isEditing"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div class="md:col-span-2">
+            <AppInput v-model="form.data_entrada" label="Data" type="date" />
+          </div>
+          <div class="md:col-span-4">
+            <AppInput v-model="form.fornecedor" label="Fornecedor (opcional)" placeholder="Nome do fornecedor" />
+          </div>
+          <div class="md:col-span-8">
+            <AppTextarea v-model="form.observacao" label="Observação (opcional)" :rows="2" />
           </div>
         </div>
 
-        <div class="p-6">
-          <v-form @submit.prevent="save">
-            <v-row>
-              <v-col cols="12" md="6">
-                <v-select
-                  :items="produtos"
-                  item-title="label"
-                  item-value="id"
-                  v-model="form.produto_id"
-                  label="Produto"
-                  :disabled="isEditing"
-                />
-              </v-col>
-              <v-col cols="12" md="2">
-                <v-text-field v-model.number="form.quantidade" label="Quantidade" type="number" :disabled="isEditing" />
-              </v-col>
-              <v-col cols="12" md="2">
-                <v-text-field
-                  v-model="form.custo_unitario_fabrica"
-                  label="Custo unit. (fábrica)"
-                  type="number"
-                  :disabled="isEditing"
-                />
-              </v-col>
-              <v-col cols="12" md="2">
-                <v-text-field v-model="form.data_entrada" label="Data" type="date" />
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-text-field v-model="form.fornecedor" label="Fornecedor (opcional)" />
-              </v-col>
-              <v-col cols="12" md="8">
-                <v-text-field v-model="form.observacao" label="Observação (opcional)" />
-              </v-col>
-            </v-row>
-
-            <div class="mt-6 pt-4 border-t border-border flex justify-end gap-3">
-              <v-btn variant="outlined" @click="closeDialog">Cancelar</v-btn>
-              <v-btn color="primary" type="submit" prepend-icon="mdi-plus" :loading="saving" :disabled="saving">
-                Registrar
-              </v-btn>
-            </div>
-          </v-form>
+        <div class="flex justify-end gap-3 border-t border-border pt-4">
+          <AppButton variant="outline" @click="closeDialog">Cancelar</AppButton>
+          <AppButton type="submit" icon="mdi-plus" :loading="saving">Registrar</AppButton>
         </div>
-      </v-card>
-    </v-dialog>
+      </form>
+    </AppModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api/client'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppInput from '@/components/ui/AppInput.vue'
+import AppModal from '@/components/ui/AppModal.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppSpinner from '@/components/ui/AppSpinner.vue'
+import AppTextarea from '@/components/ui/AppTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { formatBRL, formatDate } from '@/lib/formatters'

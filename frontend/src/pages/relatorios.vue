@@ -2,7 +2,7 @@
   <div class="max-w-7xl mx-auto">
     <PageHeader title="Relatórios" description="Vendas e lucro por período/cliente/marca">
       <template #actions>
-        <v-btn color="primary" prepend-icon="mdi-chart-box-outline" @click="load" :loading="loading">Gerar</v-btn>
+        <AppButton icon="mdi-chart-box-outline" @click="load" :loading="loading">Gerar</AppButton>
       </template>
     </PageHeader>
 
@@ -14,21 +14,17 @@
         </div>
       </div>
       <div class="app-card-body">
-        <v-row>
-          <v-col cols="12" md="3">
-            <v-text-field v-model="filtro.data_inicial" label="Data inicial" type="datetime-local" />
-          </v-col>
-          <v-col cols="12" md="3">
-            <v-text-field v-model="filtro.data_final" label="Data final" type="datetime-local" />
-          </v-col>
-          <v-col cols="12" md="3">
-            <v-text-field v-model="filtro.cliente" label="Cliente" />
-          </v-col>
-          <v-col cols="12" md="3">
-            <v-select :items="tiposSaida" v-model="filtro.tipo_saida" label="Tipo saída" clearable />
-          </v-col>
-        </v-row>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <AppInput v-model="filtro.data_inicial" label="Data inicial" type="datetime-local" />
+          <AppInput v-model="filtro.data_final" label="Data final" type="datetime-local" />
+          <AppInput v-model="filtro.cliente" label="Cliente" placeholder="Filtrar por cliente" />
+          <AppSelect v-model="filtro.tipo_saida" :items="tiposSaida" label="Tipo saída" placeholder="Todos" />
+        </div>
       </div>
+    </div>
+
+    <div v-if="loading" class="mb-6">
+      <AppSpinner :centered="false" />
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -117,6 +113,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import api from '@/api/client'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppInput from '@/components/ui/AppInput.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppSpinner from '@/components/ui/AppSpinner.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'

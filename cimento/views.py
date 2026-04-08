@@ -55,6 +55,13 @@ class AuthMeView(APIView):
 		return Response(UserMeSerializer(request.user).data)
 
 
+class HealthView(APIView):
+	permission_classes = [permissions.AllowAny]
+
+	def get(self, request):
+		return Response({'status': 'ok'})
+
+
 class DashboardView(APIView):
 	def get(self, request):
 		total_qtd = Estoque.objects.aggregate(total=Coalesce(Sum('quantidade_atual'), 0))['total']

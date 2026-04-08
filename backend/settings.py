@@ -10,10 +10,23 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+DESKTOP_MODE = os.environ.get('ESTOQUE_CIMENTO_DESKTOP') == '1'
+
+FRONTEND_DIST_DIR = Path(
+    os.environ.get('ESTOQUE_CIMENTO_FRONTEND_DIST')
+    or (BASE_DIR / 'frontend' / 'dist')
+)
+
+DATA_DIR = Path(
+    os.environ.get('ESTOQUE_CIMENTO_DATA_DIR')
+    or BASE_DIR
+)
 
 
 # Quick-start development settings - unsuitable for production
@@ -88,7 +101,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DATA_DIR / 'db.sqlite3',
     }
 }
 
@@ -138,6 +151,11 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+
+if DESKTOP_MODE:
+    # Electron/desktop local: normalmente é uma origem diferente (file:// ou app://).
+    # Como a API só fica disponível em 127.0.0.1, liberamos CORS.
     CORS_ALLOW_ALL_ORIGINS = True
 
 # Django REST Framework

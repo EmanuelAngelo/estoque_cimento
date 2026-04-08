@@ -2,11 +2,13 @@
   <div class="max-w-7xl mx-auto">
     <PageHeader title="Dashboard" description="Visão geral de estoque, vendas e lucro">
       <template #actions>
-        <v-btn variant="outlined" prepend-icon="mdi-refresh" @click="load" :loading="loading">Atualizar</v-btn>
+        <AppButton variant="outline" icon="mdi-refresh" @click="load" :loading="loading">Atualizar</AppButton>
       </template>
     </PageHeader>
 
-    <v-progress-linear v-if="loading" indeterminate class="mb-6" />
+    <div v-if="loading" class="mb-6">
+      <AppSpinner :centered="false" />
+    </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
       <StatCard
@@ -133,6 +135,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import api from '@/api/client'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppSpinner from '@/components/ui/AppSpinner.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'

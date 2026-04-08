@@ -2,7 +2,7 @@
   <div class="max-w-7xl mx-auto">
     <PageHeader title="Movimentações" description="Histórico de entradas e saídas">
       <template #actions>
-        <v-btn variant="outlined" prepend-icon="mdi-refresh" @click="load">Atualizar</v-btn>
+        <AppButton variant="outline" icon="mdi-refresh" @click="load" :loading="loading">Atualizar</AppButton>
       </template>
     </PageHeader>
 
@@ -14,20 +14,14 @@
         </div>
       </div>
       <div class="app-card-body">
-        <v-row>
-          <v-col cols="12" md="3">
-            <v-text-field v-model="filtro.data_inicial" label="Data inicial" type="datetime-local" />
-          </v-col>
-          <v-col cols="12" md="3">
-            <v-text-field v-model="filtro.data_final" label="Data final" type="datetime-local" />
-          </v-col>
-          <v-col cols="12" md="3">
-            <v-select :items="tipos" v-model="filtro.tipo" label="Tipo" clearable />
-          </v-col>
-          <v-col cols="12" md="3" class="d-flex align-center justify-end">
-            <v-btn color="primary" prepend-icon="mdi-filter" @click="load">Filtrar</v-btn>
-          </v-col>
-        </v-row>
+        <div class="grid gap-4 md:grid-cols-4">
+          <AppInput v-model="filtro.data_inicial" label="Data inicial" type="datetime-local" />
+          <AppInput v-model="filtro.data_final" label="Data final" type="datetime-local" />
+          <AppSelect v-model="filtro.tipo" :items="tipos" label="Tipo" placeholder="Todos" />
+          <div class="flex items-end justify-end">
+            <AppButton icon="mdi-filter" @click="load" :loading="loading">Filtrar</AppButton>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -39,7 +33,9 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto">
+      <AppSpinner v-if="loading" />
+
+      <div v-else class="overflow-x-auto">
         <table class="app-table">
           <thead>
             <tr>
@@ -90,6 +86,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import api from '@/api/client'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppInput from '@/components/ui/AppInput.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppSpinner from '@/components/ui/AppSpinner.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { formatDateTime } from '@/lib/formatters'
@@ -106,15 +106,21 @@ const filtro = ref<any>({
 })
 
 const items = ref<any[]>([])
+const loading = ref(false)
 
 async function load() {
-  const params = new URLSearchParams()
-  if (filtro.value.data_inicial) params.set('data_inicial', new Date(filtro.value.data_inicial).toISOString())
-  if (filtro.value.data_final) params.set('data_final', new Date(filtro.value.data_final).toISOString())
-  if (filtro.value.tipo) params.set('tipo', filtro.value.tipo)
+  loading.value = true
+  try {
+    const params = new URLSearchParams()
+    if (filtro.value.data_inicial) params.set('data_inicial', new Date(filtro.value.data_inicial).toISOString())
+    if (filtro.value.data_final) params.set('data_final', new Date(filtro.value.data_final).toISOString())
+    if (filtro.value.tipo) params.set('tipo', String(filtro.value.tipo))
 
-  const { data } = await api.get(`/movimentacoes/?${params.toString()}`)
-  items.value = data
+    const { data } = await api.get(`/movimentacoes/?${params.toString()}`)
+    items.value = data
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(load)

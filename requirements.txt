@@ -2,3 +2,4 @@ Django>=6.0,<6.1
 djangorestframework>=3.17
 django-filter>=25.2
 django-cors-headers>=4.9
+waitress>=3.0

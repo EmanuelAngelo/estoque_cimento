@@ -2,8 +2,8 @@
   <div class="max-w-7xl mx-auto">
     <PageHeader title="Vendas" description="Registro de vendas e baixa automática do estoque">
       <template #actions>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog">Nova venda</v-btn>
-        <v-btn variant="outlined" prepend-icon="mdi-refresh" @click="loadVendas">Atualizar</v-btn>
+        <AppButton icon="mdi-plus" @click="openDialog">Nova venda</AppButton>
+        <AppButton variant="outline" icon="mdi-refresh" @click="loadVendas">Atualizar</AppButton>
       </template>
     </PageHeader>
 
@@ -15,9 +15,7 @@
         </div>
       </div>
 
-      <div v-if="loadingVendas" class="p-10 flex items-center justify-center">
-        <v-progress-circular color="primary" indeterminate></v-progress-circular>
-      </div>
+      <AppSpinner v-if="loadingVendas" />
 
       <div v-else class="overflow-x-auto">
         <table class="app-table">
@@ -78,130 +76,113 @@
       </div>
     </div>
 
-    <v-dialog v-model="dialogOpen" max-width="980">
-      <v-card class="overflow-hidden rounded-[var(--radius)]" elevation="0">
-        <div class="px-6 py-5 bg-card border-b border-border">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h2 class="text-lg font-semibold text-foreground">Nova venda</h2>
-              <p class="text-sm text-muted-foreground mt-1">Informe cliente, produto e valores</p>
-            </div>
-            <v-btn icon="mdi-close" variant="text" @click="dialogOpen = false" />
+    <AppModal
+      v-model="dialogOpen"
+      :title="isEditing ? 'Editar venda' : 'Nova venda'"
+      description="Informe cliente, produto e valores"
+      max-width="xl"
+    >
+      <form class="space-y-6" @submit.prevent="save">
+        <div class="grid gap-4 md:grid-cols-12">
+          <div class="md:col-span-4">
+            <AppInput
+              v-model="form.cliente_nome"
+              label="Cliente"
+              placeholder="Nome do cliente"
+              icon="mdi-account-outline"
+              :error="fieldErrors.cliente_nome?.[0]"
+            />
+          </div>
+          <div class="md:col-span-5">
+            <AppSelect
+              v-model="form.produto_id"
+              :items="produtos"
+              item-title="label"
+              item-value="id"
+              label="Produto"
+              icon="mdi-package-variant"
+              :error="fieldErrors.produto_id?.[0]"
+              :disabled="isEditing"
+            />
+          </div>
+          <div class="md:col-span-1">
+            <AppInput
+              v-model="form.quantidade"
+              label="Qtd"
+              type="number"
+              min="1"
+              :error="fieldErrors.quantidade?.[0]"
+              :disabled="isEditing"
+            />
+          </div>
+          <div class="md:col-span-2">
+            <AppInput :model-value="String(estoqueAtual)" label="Estoque" readonly />
+          </div>
+          <div class="md:col-span-2">
+            <AppInput :model-value="String(estoqueRestante)" label="Restante" readonly :error="!isEditing && estoqueRestante < 0 ? 'Estoque insuficiente' : ''" />
+          </div>
+          <div class="md:col-span-2">
+            <AppSelect
+              v-model="form.tipo_saida"
+              :items="tiposSaida"
+              label="Tipo"
+              :error="fieldErrors.tipo_saida?.[0]"
+            />
+          </div>
+          <div class="md:col-span-3">
+            <AppInput
+              v-model="form.data_venda"
+              label="Data"
+              type="datetime-local"
+              icon="mdi-calendar"
+              :error="fieldErrors.data_venda?.[0]"
+            />
+          </div>
+          <div class="md:col-span-3">
+            <AppInput
+              v-model="form.valor_unitario_venda"
+              label="Valor unit."
+              type="number"
+              min="0"
+              step="0.01"
+              :error="fieldErrors.valor_unitario_venda?.[0]"
+            />
+          </div>
+          <div class="md:col-span-6">
+            <AppTextarea v-model="form.observacao" label="Observação (opcional)" :rows="2" />
           </div>
         </div>
 
-        <div class="p-6">
-          <v-form ref="formRef" @submit.prevent="save">
-            <v-row>
-              <v-col cols="12" md="4">
-                <v-text-field
-                  v-model="form.cliente_nome"
-                  label="Cliente"
-                  prepend-inner-icon="mdi-account"
-                  :rules="[rules.required]"
-                  :error-messages="fieldErrors.cliente_nome"
-                />
-              </v-col>
-              <v-col cols="12" md="5">
-                <v-select
-                  :items="produtos"
-                  item-title="label"
-                  item-value="id"
-                  v-model="form.produto_id"
-                  label="Produto"
-                  prepend-inner-icon="mdi-package-variant"
-                  :rules="[rules.required]"
-                  :error-messages="fieldErrors.produto_id"
-                  :disabled="isEditing"
-                />
-              </v-col>
-              <v-col cols="12" md="1">
-                <v-text-field
-                  v-model.number="form.quantidade"
-                  label="Qtd"
-                  type="number"
-                  :rules="[rules.min1]"
-                  :error-messages="fieldErrors.quantidade"
-                  :disabled="isEditing"
-                />
-              </v-col>
-              <v-col cols="12" md="2">
-                <v-text-field :model-value="String(estoqueAtual)" label="Estoque" readonly />
-              </v-col>
-              <v-col cols="12" md="2">
-                <v-text-field
-                  :model-value="String(estoqueRestante)"
-                  label="Restante"
-                  readonly
-                  :color="estoqueRestante < 0 ? 'error' : undefined"
-                />
-              </v-col>
-              <v-col cols="12" md="2">
-                <v-select
-                  :items="tiposSaida"
-                  item-title="title"
-                  item-value="value"
-                  v-model="form.tipo_saida"
-                  label="Tipo"
-                  :error-messages="fieldErrors.tipo_saida"
-                />
-              </v-col>
+        <AppAlert v-if="apiError" variant="error">{{ apiError }}</AppAlert>
 
-              <v-col cols="12" md="3">
-                <v-text-field
-                  v-model="form.data_venda"
-                  label="Data"
-                  type="datetime-local"
-                  prepend-inner-icon="mdi-calendar"
-                  :error-messages="fieldErrors.data_venda"
-                />
-              </v-col>
-              <v-col cols="12" md="3">
-                <v-text-field
-                  v-model.number="form.valor_unitario_venda"
-                  label="Valor unit."
-                  type="number"
-                  :error-messages="fieldErrors.valor_unitario_venda"
-                />
-              </v-col>
-              <v-col cols="12" md="3">
-                <v-text-field v-model="form.observacao" label="Observação (opcional)" />
-              </v-col>
+        <AppAlert v-if="!isEditing && estoqueRestante < 0" variant="warning">
+          Quantidade maior que o estoque disponível. Reduza a quantidade.
+        </AppAlert>
 
-              <v-col cols="12" v-if="apiError">
-                <v-alert type="error" variant="tonal">{{ apiError }}</v-alert>
-              </v-col>
+        <AppAlert variant="info">
+          Total venda: <strong>{{ formatBRL(totalVenda) }}</strong> — Lucro:
+          <strong>{{ formatBRL(totalLucroEstimado) }}</strong>
+        </AppAlert>
 
-              <v-col cols="12" v-if="!isEditing && estoqueRestante < 0">
-                <v-alert type="warning" variant="tonal">
-                  Quantidade maior que o estoque disponível. Reduza a quantidade.
-                </v-alert>
-              </v-col>
-
-              <v-col cols="12">
-                <v-alert type="info" variant="tonal">
-                  Total venda: <strong>{{ formatBRL(totalVenda) }}</strong> — Lucro:
-                  <strong>{{ formatBRL(totalLucroEstimado) }}</strong>
-                </v-alert>
-              </v-col>
-            </v-row>
-
-            <div class="mt-6 pt-4 border-t border-border flex justify-end gap-3">
-              <v-btn variant="outlined" @click="dialogOpen = false">Cancelar</v-btn>
-              <v-btn color="primary" type="submit" prepend-icon="mdi-plus" :loading="saving" :disabled="!canSubmit">
-                Registrar
-              </v-btn>
-            </div>
-          </v-form>
+        <div class="flex justify-end gap-3 border-t border-border pt-4">
+          <AppButton variant="outline" @click="dialogOpen = false">Cancelar</AppButton>
+          <AppButton type="submit" icon="mdi-plus" :loading="saving" :disabled="!canSubmit">Registrar</AppButton>
         </div>
-      </v-card>
-    </v-dialog>
+      </form>
+    </AppModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api/client'
+import AppAlert from '@/components/ui/AppAlert.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppInput from '@/components/ui/AppInput.vue'
+import AppModal from '@/components/ui/AppModal.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppSpinner from '@/components/ui/AppSpinner.vue'
+import AppTextarea from '@/components/ui/AppTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { formatBRL, formatDateTime } from '@/lib/formatters'
@@ -230,7 +211,6 @@ const dialogOpen = ref(false)
 const editingId = ref<number | null>(null)
 const isEditing = computed(() => editingId.value != null)
 
-const formRef = ref<any>(null)
 const saving = ref(false)
 const apiError = ref('')
 const fieldErrors = ref<Record<string, string[]>>({})
@@ -239,14 +219,29 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-const rules = {
-  required: (v: any) => !!String(v ?? '').trim() || 'Obrigatório',
-  min1: (v: any) => Number(v ?? 0) >= 1 || 'Mínimo 1',
-}
-
 function clearErrors() {
   apiError.value = ''
   fieldErrors.value = {}
+}
+
+function validateForm() {
+  const errors: Record<string, string[]> = {}
+
+  if (!String(form.value.cliente_nome ?? '').trim()) {
+    errors.cliente_nome = ['Obrigatório']
+  }
+  if (!form.value.produto_id) {
+    errors.produto_id = ['Obrigatório']
+  }
+  if (Number(form.value.quantidade ?? 0) < 1) {
+    errors.quantidade = ['Mínimo 1']
+  }
+  if (!form.value.tipo_saida) {
+    errors.tipo_saida = ['Obrigatório']
+  }
+
+  fieldErrors.value = errors
+  return Object.keys(errors).length === 0
 }
 
 function setErrorsFromResponse(data: any) {
@@ -408,8 +403,7 @@ async function loadVendas(minDurationMs = 0) {
 async function save() {
   const startedAt = Date.now()
   clearErrors()
-  const validation = await formRef.value?.validate?.()
-  if (validation && validation.valid === false) return
+  if (!validateForm()) return
 
   if (!canSubmit.value) {
     apiError.value = 'Quantidade maior que o estoque disponível.'

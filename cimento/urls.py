@@ -5,6 +5,7 @@ from .views import (
     AuthLoginView,
     AuthLogoutView,
     AuthMeView,
+    HealthView,
     DashboardView,
     EntradaEstoqueViewSet,
     EstoqueViewSet,
@@ -24,6 +25,7 @@ router.register('vendas', VendaViewSet, basename='vendas')
 router.register('movimentacoes', MovimentacaoEstoqueViewSet, basename='movimentacoes')
 
 urlpatterns = [
+	path('health/', HealthView.as_view(), name='health'),
     path('auth/login/', AuthLoginView.as_view(), name='auth-login'),
     path('auth/logout/', AuthLogoutView.as_view(), name='auth-logout'),
     path('auth/me/', AuthMeView.as_view(), name='auth-me'),
