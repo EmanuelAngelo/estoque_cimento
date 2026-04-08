@@ -13,6 +13,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+
+def _split_env_list(name: str) -> list[str]:
+    raw_value = os.environ.get(name, '')
+    return [item.strip() for item in raw_value.split(',') if item.strip()]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -38,9 +43,18 @@ SECRET_KEY = 'django-insecure-67=5@*x7s5$a&^j9a)#1-htg4tw05&$4647(^yinvx5#-rkdx%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+PYTHONANYWHERE_HOST = 'silvaniacoutinho19.pythonanywhere.com'
+
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    PYTHONANYWHERE_HOST,
+    * _split_env_list('DJANGO_ALLOWED_HOSTS'),
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{PYTHONANYWHERE_HOST}',
+    * _split_env_list('DJANGO_CSRF_TRUSTED_ORIGINS'),
 ]
 
 
@@ -148,6 +162,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    f'https://{PYTHONANYWHERE_HOST}',
+    * _split_env_list('DJANGO_CORS_ALLOWED_ORIGINS'),
 ]
 
 if DEBUG:
