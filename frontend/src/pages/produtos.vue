@@ -230,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import api from '@/api/client'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
@@ -370,6 +370,24 @@ function createDefaultForm() {
   }
 }
 
+function mapItemToForm(item: any) {
+  return {
+    id: item.id ?? null,
+    tipo_material: item.tipo_material ?? 'OUTRO',
+    marca: item.marca ?? '',
+    nome_produto: item.nome_produto ?? '',
+    descricao_produto: item.descricao_produto ?? '',
+    unidade_estoque: item.unidade_estoque ?? item.unidade_medida ?? 'UNIDADE',
+    unidade_medida: item.unidade_medida ?? item.unidade_estoque ?? 'UNIDADE',
+    quantidade_por_unidade: Number(item.quantidade_por_unidade ?? 1),
+    custo_unitario_fabrica: Number(item.custo_unitario_fabrica ?? 0),
+    preco_unitario_loja: Number(item.preco_unitario_loja ?? 0),
+    conversoes_unidade: (item.conversoes_unidade ?? []).map((row: any) => createConversionRow(row)),
+    precos_venda: (item.precos_venda ?? []).map((row: any) => createPriceRow(row)),
+    ativo: item.ativo !== false,
+  }
+}
+
 function normalizePayload() {
   return {
     ...form.value,
@@ -427,19 +445,10 @@ function openCreate() {
   dialogOpen.value = true
 }
 
-function openEdit(item: any) {
+async function openEdit(item: any) {
   hydratingForm.value = true
-  form.value = {
-    ...item,
-    marca: item.marca ?? '',
-    unidade_estoque: item.unidade_estoque ?? item.unidade_medida ?? 'UNIDADE',
-    unidade_medida: item.unidade_medida ?? item.unidade_estoque ?? 'UNIDADE',
-    quantidade_por_unidade: Number(item.quantidade_por_unidade ?? 1),
-    custo_unitario_fabrica: Number(item.custo_unitario_fabrica ?? 0),
-    preco_unitario_loja: Number(item.preco_unitario_loja ?? 0),
-    conversoes_unidade: (item.conversoes_unidade ?? []).map((row: any) => createConversionRow(row)),
-    precos_venda: (item.precos_venda ?? []).map((row: any) => createPriceRow(row)),
-  }
+  form.value = mapItemToForm(item)
+  await nextTick()
   hydratingForm.value = false
   dialogOpen.value = true
 }
