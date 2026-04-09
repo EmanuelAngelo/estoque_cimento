@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from typing import Optional
 
 from django.db import transaction
@@ -26,6 +27,14 @@ from .models import (
 
 MONEY_PRECISION = Decimal('0.01')
 QUANTITY_PRECISION = Decimal('0.000001')
+STORE_NAME = 'Material de Construção Batatã'
+STORE_PHONE = 'Telefone WhatsApp: 98 988495700'
+STORE_ADDRESS_LINES = [
+    'Endereço: Avenida Engenheiro Emiliano Macieira 22',
+    'Km 03 BR 135 Tibiri',
+    'São Luís, MA 65095600',
+]
+STORE_LOGO_PATH = Path(__file__).resolve().parent.parent / 'frontend' / 'public' / 'batatalogo.jpeg'
 
 
 @dataclass(frozen=True)
@@ -557,90 +566,348 @@ def criar_orcamento(
 
 def gerar_pdf_orcamento(orcamento: Orcamento) -> BytesIO:
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_RIGHT
     from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas
+    from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=16 * mm,
+        rightMargin=16 * mm,
+        topMargin=14 * mm,
+        bottomMargin=14 * mm,
+        title=f'Orcamento {orcamento.id}',
+    )
 
-    y = height - 20 * mm
+    styles = getSampleStyleSheet()
+    palette = {
+        'primary': colors.HexColor('#1f2937'),
+        'accent': colors.HexColor('#c08b5c'),
+        'text': colors.HexColor('#374151'),
+        'muted': colors.HexColor('#6b7280'),
+        'line': colors.HexColor('#e7e2da'),
+        'line_soft': colors.HexColor('#f1ede7'),
+        'surface': colors.HexColor('#fbf8f4'),
+        'surface_alt': colors.HexColor('#f7f3ee'),
+        'white': colors.white,
+    }
 
-    pdf.setTitle(f'Orcamento {orcamento.id}')
-    pdf.setFont('Helvetica-Bold', 18)
-    pdf.drawString(20 * mm, y, 'Orcamento de Materiais')
+    title_style = ParagraphStyle(
+        'QuoteTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=24,
+        textColor=palette['primary'],
+        spaceAfter=2 * mm,
+    )
+    subtitle_style = ParagraphStyle(
+        'QuoteSubtitle',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=palette['muted'],
+    )
+    store_name_style = ParagraphStyle(
+        'StoreName',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        leading=18,
+        textColor=palette['primary'],
+        spaceAfter=1 * mm,
+    )
+    store_info_style = ParagraphStyle(
+        'StoreInfo',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=12,
+        textColor=palette['text'],
+    )
+    meta_label_style = ParagraphStyle(
+        'MetaLabel',
+        parent=styles['BodyText'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=palette['muted'],
+        textTransform=None,
+    )
+    meta_value_style = ParagraphStyle(
+        'MetaValue',
+        parent=styles['BodyText'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=14,
+        textColor=palette['primary'],
+    )
+    table_header_style = ParagraphStyle(
+        'TableHeader',
+        parent=styles['BodyText'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=12,
+        textColor=palette['primary'],
+    )
+    table_cell_style = ParagraphStyle(
+        'TableCell',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=13,
+        textColor=palette['text'],
+    )
+    table_cell_right_style = ParagraphStyle(
+        'TableCellRight',
+        parent=table_cell_style,
+        alignment=TA_RIGHT,
+    )
+    summary_label_style = ParagraphStyle(
+        'SummaryLabel',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=12,
+        textColor=palette['muted'],
+    )
+    summary_value_style = ParagraphStyle(
+        'SummaryValue',
+        parent=styles['BodyText'],
+        fontName='Helvetica-Bold',
+        fontSize=10.5,
+        leading=12,
+        textColor=palette['primary'],
+        alignment=TA_RIGHT,
+    )
+    total_label_style = ParagraphStyle(
+        'TotalLabel',
+        parent=summary_label_style,
+        fontName='Helvetica-Bold',
+        fontSize=10.5,
+        textColor=palette['primary'],
+    )
+    total_value_style = ParagraphStyle(
+        'TotalValue',
+        parent=summary_value_style,
+        fontSize=12,
+        textColor=palette['accent'],
+    )
+    note_title_style = ParagraphStyle(
+        'NoteTitle',
+        parent=styles['BodyText'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=13,
+        textColor=palette['primary'],
+    )
+    note_body_style = ParagraphStyle(
+        'NoteBody',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=14,
+        textColor=palette['text'],
+    )
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=12,
+        textColor=palette['muted'],
+        alignment=TA_RIGHT,
+    )
 
-    y -= 10 * mm
-    pdf.setStrokeColor(colors.HexColor('#d9d4ca'))
-    pdf.line(20 * mm, y, width - 20 * mm, y)
+    def paragraph(text, style):
+        return Paragraph(str(text), style)
 
-    y -= 12 * mm
-    pdf.setFont('Helvetica', 11)
-    pdf.drawString(20 * mm, y, f'Cliente: {orcamento.cliente_nome}')
-    pdf.drawRightString(width - 20 * mm, y, f'Emissao: {timezone.localtime(orcamento.data_orcamento).strftime("%d/%m/%Y %H:%M")}')
+    def money_text(value: Decimal) -> str:
+        return f'R$ {_quantize_money(value):.2f}'
 
-    y -= 7 * mm
-    validade = timezone.localtime(orcamento.data_orcamento) + timedelta(days=orcamento.validade_dias)
-    pdf.drawString(20 * mm, y, f'Validade: {validade.strftime("%d/%m/%Y")}')
-    pdf.drawRightString(width - 20 * mm, y, f'Responsavel: {orcamento.usuario_responsavel.username}')
+    def quantity_text(value: Decimal) -> str:
+        return f'{_to_decimal(value):f}'.rstrip('0').rstrip('.') or '0'
 
-    y -= 14 * mm
-    pdf.setFont('Helvetica-Bold', 10)
-    pdf.drawString(20 * mm, y, 'Produto')
-    pdf.drawString(100 * mm, y, 'Qtd')
-    pdf.drawString(120 * mm, y, 'Unidade')
-    pdf.drawRightString(165 * mm, y, 'Preco unit.')
-    pdf.drawRightString(190 * mm, y, 'Subtotal')
+    issued_at = timezone.localtime(orcamento.data_orcamento)
+    validade = issued_at + timedelta(days=orcamento.validade_dias)
 
-    y -= 4 * mm
-    pdf.line(20 * mm, y, width - 20 * mm, y)
+    story = []
+    store_info_text = '<br/>'.join([STORE_PHONE, *STORE_ADDRESS_LINES])
+    logo_flowable = ''
+    if STORE_LOGO_PATH.exists():
+        logo_flowable = Image(str(STORE_LOGO_PATH), width=26 * mm, height=26 * mm)
 
-    pdf.setFont('Helvetica', 10)
+    header_table = Table(
+        [
+            [
+                logo_flowable,
+                [
+                    paragraph(STORE_NAME, store_name_style),
+                    paragraph('Orçamento de Materiais', title_style),
+                    paragraph('Proposta comercial organizada para apresentação ao cliente.', subtitle_style),
+                    Spacer(1, 1.5 * mm),
+                    paragraph(store_info_text, store_info_style),
+                ],
+                paragraph(f'Orçamento #{orcamento.id}', table_cell_right_style),
+            ]
+        ],
+        colWidths=[30 * mm, 102 * mm, 46 * mm],
+    )
+    header_table.setStyle(
+        TableStyle(
+            [
+                ('BACKGROUND', (0, 0), (-1, -1), palette['surface']),
+                ('BOX', (0, 0), (-1, -1), 0.6, palette['line']),
+                ('LINEBELOW', (0, 0), (-1, -1), 0.6, palette['line']),
+                ('LINEAFTER', (1, 0), (1, 0), 0.35, palette['line_soft']),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 14),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 14),
+                ('TOPPADDING', (0, 0), (-1, -1), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ]
+        )
+    )
+    story.append(header_table)
+    story.append(Spacer(1, 6 * mm))
+
+    info_table = Table(
+        [
+            [
+                [paragraph('CLIENTE', meta_label_style), paragraph(orcamento.cliente_nome, meta_value_style)],
+                [paragraph('EMISSÃO', meta_label_style), paragraph(issued_at.strftime('%d/%m/%Y %H:%M'), meta_value_style)],
+            ],
+            [
+                [paragraph('VALIDADE', meta_label_style), paragraph(validade.strftime('%d/%m/%Y'), meta_value_style)],
+                [paragraph('RESPONSÁVEL', meta_label_style), paragraph(orcamento.usuario_responsavel.username, meta_value_style)],
+            ],
+        ],
+        colWidths=[89 * mm, 89 * mm],
+    )
+    info_table.setStyle(
+        TableStyle(
+            [
+                ('BACKGROUND', (0, 0), (-1, -1), palette['white']),
+                ('BOX', (0, 0), (-1, -1), 0.5, palette['line']),
+                ('INNERGRID', (0, 0), (-1, -1), 0.35, palette['line_soft']),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ]
+        )
+    )
+    story.append(info_table)
+    story.append(Spacer(1, 7 * mm))
+
+    itens_data = [
+        [
+            paragraph('Produto', table_header_style),
+            paragraph('Qtd', table_header_style),
+            paragraph('Unidade', table_header_style),
+            paragraph('Preço unit.', table_header_style),
+            paragraph('Subtotal', table_header_style),
+        ]
+    ]
+
     for item in orcamento.itens.select_related('produto').all():
-        y -= 8 * mm
-        if y < 30 * mm:
-            pdf.showPage()
-            y = height - 20 * mm
-            pdf.setFont('Helvetica', 10)
-
         produto_nome = item.produto.nome_produto
         if item.produto.marca:
             produto_nome = f'{item.produto.get_marca_display()} - {produto_nome}'
 
-        pdf.drawString(20 * mm, y, produto_nome[:48])
-        pdf.drawString(100 * mm, y, f'{item.quantidade:.3f}'.rstrip('0').rstrip('.'))
-        pdf.drawString(120 * mm, y, UnidadeMedida(item.unidade_venda).label)
-        pdf.drawRightString(165 * mm, y, f'R$ {item.preco_unitario:.2f}')
-        pdf.drawRightString(190 * mm, y, f'R$ {item.subtotal:.2f}')
-
-    y -= 12 * mm
-    pdf.setFont('Helvetica', 10)
-    pdf.drawRightString(190 * mm, y, f'Total bruto: R$ {orcamento.valor_total_bruto:.2f}')
-
-    if orcamento.desconto_percentual > 0:
-        y -= 6 * mm
-        pdf.drawRightString(
-            190 * mm,
-            y,
-            f'Desconto: {orcamento.desconto_percentual:.2f}% (R$ {orcamento.desconto_valor:.2f})',
+        itens_data.append(
+            [
+                paragraph(produto_nome, table_cell_style),
+                paragraph(quantity_text(item.quantidade), table_cell_right_style),
+                paragraph(UnidadeMedida(item.unidade_venda).label, table_cell_style),
+                paragraph(money_text(item.preco_unitario), table_cell_right_style),
+                paragraph(money_text(item.subtotal), table_cell_right_style),
+            ]
         )
 
-    y -= 8 * mm
-    pdf.setFont('Helvetica-Bold', 12)
-    pdf.drawRightString(190 * mm, y, f'Total final: R$ {orcamento.valor_total:.2f}')
+    itens_table = Table(itens_data, colWidths=[84 * mm, 18 * mm, 28 * mm, 28 * mm, 30 * mm], repeatRows=1)
+    itens_style_commands = [
+        ('BACKGROUND', (0, 0), (-1, 0), palette['surface_alt']),
+        ('TEXTCOLOR', (0, 0), (-1, 0), palette['primary']),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.6, palette['line']),
+        ('BOX', (0, 0), (-1, -1), 0.5, palette['line']),
+        ('INNERGRID', (0, 0), (-1, -1), 0.35, palette['line_soft']),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]
+    for row_index in range(1, len(itens_data)):
+        if row_index % 2 == 0:
+            itens_style_commands.append(('BACKGROUND', (0, row_index), (-1, row_index), palette['surface']))
+    itens_table.setStyle(TableStyle(itens_style_commands))
+    story.append(itens_table)
+    story.append(Spacer(1, 6 * mm))
+
+    resumo_data = [
+        [paragraph('Total bruto', summary_label_style), paragraph(money_text(orcamento.valor_total_bruto), summary_value_style)]
+    ]
+    if orcamento.desconto_percentual > 0:
+        resumo_data.append(
+            [
+                paragraph(
+                    f'Desconto ({orcamento.desconto_percentual:.2f}%)',
+                    summary_label_style,
+                ),
+                paragraph(money_text(orcamento.desconto_valor), summary_value_style),
+            ]
+        )
+    resumo_data.append([paragraph('Total final', total_label_style), paragraph(money_text(orcamento.valor_total), total_value_style)])
+
+    resumo_table = Table(resumo_data, colWidths=[42 * mm, 38 * mm], hAlign='RIGHT')
+    resumo_table.setStyle(
+        TableStyle(
+            [
+                ('BACKGROUND', (0, 0), (-1, -1), palette['surface']),
+                ('BOX', (0, 0), (-1, -1), 0.6, palette['line']),
+                ('INNERGRID', (0, 0), (-1, -1), 0.35, palette['line_soft']),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+    story.append(resumo_table)
 
     if orcamento.observacao:
-        y -= 12 * mm
-        pdf.setFont('Helvetica-Bold', 10)
-        pdf.drawString(20 * mm, y, 'Observacoes')
-        y -= 6 * mm
-        pdf.setFont('Helvetica', 10)
-        for linha in str(orcamento.observacao).splitlines() or ['']:
-            pdf.drawString(20 * mm, y, linha[:95])
-            y -= 5 * mm
+        story.append(Spacer(1, 7 * mm))
+        observacao_table = Table(
+            [[paragraph('Observações', note_title_style)], [paragraph(orcamento.observacao.replace('\n', '<br/>'), note_body_style)]],
+            colWidths=[178 * mm],
+        )
+        observacao_table.setStyle(
+            TableStyle(
+                [
+                    ('BACKGROUND', (0, 0), (-1, 0), palette['surface_alt']),
+                    ('BACKGROUND', (0, 1), (-1, -1), palette['white']),
+                    ('BOX', (0, 0), (-1, -1), 0.5, palette['line']),
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.35, palette['line']),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(observacao_table)
 
-    pdf.showPage()
-    pdf.save()
+    story.append(Spacer(1, 8 * mm))
+    story.append(paragraph('Obrigado pela preferência. Valores sujeitos à disponibilidade de estoque durante a validade deste orçamento.', footer_style))
+
+    document.build(story)
     buffer.seek(0)
     return buffer

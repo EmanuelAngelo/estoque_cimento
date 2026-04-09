@@ -235,6 +235,20 @@
         </div>
       </form>
     </AppModal>
+
+    <AppConfirmDialog
+      v-model="confirmDeleteOpen"
+      title="Confirmar exclusão do material"
+      :description="confirmDeleteDescription"
+      confirm-text="Excluir material"
+      :loading="deletingId !== null"
+      @confirm="confirmRemove"
+    >
+      <p>
+        Se esse material já tiver histórico, ele será inativado automaticamente para preservar entradas, vendas,
+        movimentações e orçamentos.
+      </p>
+    </AppConfirmDialog>
   </div>
 </template>
 
@@ -243,6 +257,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import api from '@/api/client'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -285,6 +300,8 @@ const form = ref<any>({})
 const hydratingForm = ref(false)
 const deletingId = ref<number | null>(null)
 const pageFeedback = ref<{ variant: 'info' | 'success' | 'warning' | 'error'; message: string } | null>(null)
+const confirmDeleteOpen = ref(false)
+const itemPendingRemoval = ref<any | null>(null)
 
 const isCimento = computed(() => form.value.tipo_material === 'CIMENTO')
 const measureFieldLabel = computed(() => {
@@ -296,6 +313,12 @@ const measureFieldLabel = computed(() => {
     default:
       return 'Medida por item'
   }
+})
+
+const confirmDeleteDescription = computed(() => {
+  const item = itemPendingRemoval.value
+  if (!item) return 'Deseja realmente excluir este material?'
+  return `Deseja excluir o material "${item.nome_produto}"?`
 })
 
 function getQuantidadeStep() {
@@ -531,10 +554,16 @@ async function toggleAtivo(item: any) {
   await load(2000)
 }
 
-async function remove(item: any) {
-  pageFeedback.value = null
-  if (!confirm('Excluir este material? Se já houver histórico, ele será apenas inativado para preservar os registros.')) return
+function remove(item: any) {
+  itemPendingRemoval.value = item
+  confirmDeleteOpen.value = true
+}
 
+async function confirmRemove() {
+  const item = itemPendingRemoval.value
+  if (!item) return
+
+  pageFeedback.value = null
   deletingId.value = item.id
   try {
     const response = await api.delete(`/produtos/${item.id}/`)
@@ -551,6 +580,8 @@ async function remove(item: any) {
       message: getApiMessage(error?.response?.data, 'Não foi possível excluir o material.'),
     }
   } finally {
+    confirmDeleteOpen.value = false
+    itemPendingRemoval.value = null
     deletingId.value = null
   }
 }

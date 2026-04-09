@@ -62,7 +62,7 @@
                   {{ it.tipo_movimentacao }}
                 </span>
               </td>
-              <td class="text-right font-medium">{{ it.quantidade }}</td>
+              <td class="text-right font-medium">{{ formatQuantity(it.quantidade) }}</td>
               <td class="text-muted-foreground">{{ it.referencia_tipo }}</td>
               <td class="text-right text-muted-foreground">{{ it.referencia_id }}</td>
               <td class="text-muted-foreground">{{ it.usuario_responsavel }}</td>
@@ -92,7 +92,7 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { formatDateTime } from '@/lib/formatters'
+import { formatDateTime, formatQuantity } from '@/lib/formatters'
 
 const tipos = [
   { title: 'Entrada', value: 'ENTRADA' },

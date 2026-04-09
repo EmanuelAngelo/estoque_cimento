@@ -183,6 +183,17 @@
         </div>
       </form>
     </AppModal>
+
+    <AppConfirmDialog
+      v-model="confirmDeleteOpen"
+      title="Cancelar venda"
+      :description="confirmDeleteDescription"
+      confirm-text="Cancelar venda"
+      :loading="deletingId !== null"
+      @confirm="confirmRemove"
+    >
+      <p>Ao confirmar, a venda será cancelada e o estoque dos itens será estornado automaticamente.</p>
+    </AppConfirmDialog>
   </div>
 </template>
 
@@ -191,6 +202,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api/client'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -231,6 +243,9 @@ const form = ref<any>({
 })
 
 const dialogOpen = ref(false)
+const confirmDeleteOpen = ref(false)
+const deletingId = ref<number | null>(null)
+const itemPendingRemoval = ref<any | null>(null)
 
 const editingId = ref<number | null>(null)
 const isEditing = computed(() => editingId.value != null)
@@ -238,6 +253,11 @@ const isEditing = computed(() => editingId.value != null)
 const saving = ref(false)
 const apiError = ref('')
 const fieldErrors = ref<Record<string, string[]>>({})
+const confirmDeleteDescription = computed(() => {
+  const item = itemPendingRemoval.value
+  if (!item) return 'Deseja cancelar esta venda?'
+  return `Deseja cancelar a venda para ${item.cliente_nome} registrada em ${formatDateTime(item.data_venda)}?`
+})
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -543,11 +563,25 @@ async function save() {
   }
 }
 
-async function remove(it: any) {
-  if (!confirm('Excluir (cancelar) esta venda? Isso vai estornar no estoque.')) return
-  await api.delete(`/vendas/${it.id}/`)
-  await loadProdutos()
-  await loadVendas(2000)
+function remove(it: any) {
+  itemPendingRemoval.value = it
+  confirmDeleteOpen.value = true
+}
+
+async function confirmRemove() {
+  const item = itemPendingRemoval.value
+  if (!item) return
+
+  deletingId.value = item.id
+  try {
+    await api.delete(`/vendas/${item.id}/`)
+    confirmDeleteOpen.value = false
+    itemPendingRemoval.value = null
+    await loadProdutos()
+    await loadVendas(2000)
+  } finally {
+    deletingId.value = null
+  }
 }
 
 onMounted(async () => {

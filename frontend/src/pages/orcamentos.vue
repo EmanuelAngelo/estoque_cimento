@@ -176,6 +176,17 @@
         </div>
       </form>
     </AppModal>
+
+    <AppConfirmDialog
+      v-model="confirmDeleteOpen"
+      title="Excluir orçamento"
+      :description="confirmDeleteDescription"
+      confirm-text="Excluir orçamento"
+      :loading="deletingId !== null"
+      @confirm="confirmRemove"
+    >
+      <p>Essa ação remove o orçamento selecionado. O PDF já baixado não será apagado do dispositivo do cliente.</p>
+    </AppConfirmDialog>
   </div>
 </template>
 
@@ -184,6 +195,7 @@ import { computed, onMounted, ref } from 'vue'
 import api from '@/api/client'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -198,10 +210,18 @@ const produtos = ref<any[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogOpen = ref(false)
+const confirmDeleteOpen = ref(false)
+const deletingId = ref<number | null>(null)
+const itemPendingRemoval = ref<any | null>(null)
 const downloadingPdfId = ref<number | null>(null)
 const pdfError = ref('')
 
 const form = ref<any>({})
+const confirmDeleteDescription = computed(() => {
+  const item = itemPendingRemoval.value
+  if (!item) return 'Deseja excluir este orçamento?'
+  return `Deseja excluir o orçamento de ${item.cliente_nome} no valor de ${formatBRL(item.valor_total)}?`
+})
 
 const totalBruto = computed(() =>
   (form.value.itens ?? []).reduce((total: number, row: any) => total + rowSubtotal(row), 0),
@@ -373,10 +393,24 @@ async function downloadPdf(id: number) {
   }
 }
 
-async function remove(item: any) {
-  if (!confirm('Excluir este orçamento?')) return
-  await api.delete(`/orcamentos/${item.id}/`)
-  await loadOrcamentos(2000)
+function remove(item: any) {
+  itemPendingRemoval.value = item
+  confirmDeleteOpen.value = true
+}
+
+async function confirmRemove() {
+  const item = itemPendingRemoval.value
+  if (!item) return
+
+  deletingId.value = item.id
+  try {
+    await api.delete(`/orcamentos/${item.id}/`)
+    confirmDeleteOpen.value = false
+    itemPendingRemoval.value = null
+    await loadOrcamentos(2000)
+  } finally {
+    deletingId.value = null
+  }
 }
 
 onMounted(async () => {
