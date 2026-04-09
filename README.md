@@ -1,27 +1,49 @@
-# Estoque de Cimento
+# Material de Construção Batatã
 
-Sistema interno de controle de **estoque** e **vendas** de cimento.
+Sistema interno de controle de **estoque**, **vendas**, **movimentações** e **orçamentos** para loja de materiais de construção.
 
 - **Backend:** Django + Django REST Framework (TokenAuth)
-- **Frontend:** Vue 3 + Vite + TypeScript + Vuetify + Tailwind
+- **Frontend:** Vue 3 + Vite + TypeScript + Tailwind (com componentes próprios e parte da base ainda usando Vuetify)
 
 ## Funcionalidades
 
 - Login obrigatório (token)
-- Cadastro de produtos (marca, peso, custo de fábrica, preço de loja, ativo/inativo)
-- Entradas de estoque (custo de compra) com atualização de custo médio
+- Cadastro de materiais genéricos (cimento, tijolo, areia e outros)
+- Cadastro de produtos com marca, unidade de estoque, unidade comercial, custo, preço e ativo/inativo
+- Entradas de estoque com atualização de custo médio
 - Vendas com baixa automática de estoque e cálculo de lucro
 - Cancelamento seguro (DELETE) de entradas e vendas com estorno de estoque
+- Exclusão segura de materiais: apaga da base só quando não existe histórico; caso contrário, inativa o cadastro
+- Conversões entre unidades de estoque e venda (ex.: `metro`, `lata`, `carrada`, `milheiro`)
+- Preços de venda por unidade
 - Dashboard e relatórios (resumo, por cliente, por marca)
+- Orçamentos com geração de PDF
+- Tela de login personalizada com identidade visual da loja
+- Modo desktop Windows/offline com Electron + Waitress
 
 ## Regras de negócio (resumo)
 
-- **Entrada:** registra quantidade e **custo unitário de compra** (`custo_unitario_fabrica`).
+- **Entrada:** registra quantidade e custo na unidade informada, convertendo para a unidade de estoque quando necessário.
 - **Estoque:** mantém `quantidade_atual` e `custo_medio_unitario` (média ponderada).
-- **Venda:** usa o custo do estoque para custo/lucro:
+- **Venda:** usa o custo do estoque para custo/lucro e aceita venda em unidade diferente da unidade de estoque:
 	- `custo_unitario` = `Estoque.custo_medio_unitario` (se > 0), senão `Produto.custo_unitario_fabrica`.
 	- `lucro_unitario` = `preco_unitario_venda - custo_unitario`.
+- **Conversões:** o sistema resolve conversões entre unidades cadastradas no produto.
+- **Preço de venda:** pode existir preço específico por unidade; se não existir, o sistema tenta derivar pelo fator de conversão.
 - **Cancelamento:** entradas/vendas são marcadas como `cancelada=True` e o estoque é estornado.
+- **Exclusão de produto com histórico:** produtos já usados em entradas, vendas, movimentações ou orçamentos não são removidos fisicamente; são inativados para preservar o histórico.
+
+## Atualizações importantes recentes
+
+- **Materiais genéricos:** o sistema deixou de ser apenas “estoque de cimento” e passou a atender diferentes tipos de materiais.
+- **Unidades e conversões:** suporte a `KG`, `UNIDADE`, `LATA`, `MILHEIRO`, `CARRADA`, `METRO`, `METRO_QUADRADO`, `METRO_CUBICO` e `PACOTE`.
+- **Areia e tijolo:** agora é possível trabalhar corretamente com areia por `metro`, `lata` e `carrada`, além de tijolo por `unidade` e `milheiro`.
+- **Formatação de quantidade:** quantidades inteiras passaram a ser exibidas sem zeros desnecessários, por exemplo `2` em vez de `2.0000`.
+- **PDF de orçamento:** recebeu layout mais elegante, tabela com linhas suaves, resumo visual melhor e identidade da loja com logo, nome, WhatsApp e endereço.
+- **Exclusão com confirmação customizada:** os `confirm()` nativos do navegador foram substituídos por modais próprios nas telas principais.
+- **Login com branding:** a tela de login agora usa a logo da loja e paleta visual personalizada.
+- **Desktop/offline:** já existe scaffold para empacotar o sistema como app Windows com backend local.
+- **Ambiente Python:** atenção para a existência de `venv/` e `.venv/`; dependendo de como o servidor estiver rodando, as dependências precisam estar instaladas no ambiente correto.
 
 ## Estrutura do repo
 
@@ -29,7 +51,7 @@ Sistema interno de controle de **estoque** e **vendas** de cimento.
 manage.py
 backend/            # Django settings/urls
 cimento/            # App principal (models/services/serializers/views)
-frontend/           # Vue 3 + Vuetify + Tailwind
+frontend/           # Vue 3 + Tailwind + componentes próprios de UI
 requirements.txt
 ```
 
@@ -64,6 +86,8 @@ API base: `http://127.0.0.1:8000/api/`
 Admin: `http://127.0.0.1:8000/admin/`
 
 **CORS (dev):** no `backend/settings.py` está liberado para origens locais e em `DEBUG` está com `CORS_ALLOW_ALL_ORIGINS = True`.
+
+**Observação sobre ambiente:** em algumas máquinas podem coexistir `venv/` e `.venv/`. Verifique qual ambiente está sendo usado pelo Django antes de instalar dependências como `reportlab`, `pillow` ou `waitress`.
 
 ### 2) Frontend (Vue/Vite)
 
@@ -103,6 +127,8 @@ Operação:
 - `GET/POST/PATCH/DELETE /api/entradas/` (DELETE = cancelar com estorno)
 - `GET/POST/PATCH/DELETE /api/vendas/` (DELETE = cancelar com estorno)
 - `GET /api/movimentacoes/`
+- `GET/POST/DELETE /api/orcamentos/`
+- `GET /api/orcamentos/<id>/pdf/`
 
 Dashboard e relatórios:
 
@@ -115,6 +141,19 @@ Dashboard e relatórios:
 
 - Banco default é **SQLite** (`db.sqlite3`) para facilitar o dev.
 - O frontend exibe loaders/spinners nas listas e mantém um tempo mínimo de 2s nas ações de salvar/excluir para feedback visual.
+- A listagem de materiais, entradas, vendas, movimentações e orçamentos usa componentes próprios de UI para manter a identidade visual consistente.
+- A exclusão de entradas e vendas é lógica/cancelamento, com estorno de estoque.
+- A exclusão de produto é física apenas quando não existe histórico relacionado.
+
+## Identidade visual da loja
+
+- **Nome exibido no sistema:** `Material de Construção Batatã`
+- **Logo usada no frontend e no PDF:** `frontend/public/batatalogo.jpeg`
+- **Dados usados no PDF de orçamento:**
+	- `Telefone WhatsApp: 98 988495700`
+	- `Endereço: Avenida Engenheiro Emiliano Macieira 22`
+	- `Km 03 BR 135 Tibiri`
+	- `São Luís, MA 65095600`
 
 ## Rodar como aplicativo Windows (100% offline)
 
