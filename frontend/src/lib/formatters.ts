@@ -103,3 +103,39 @@ export function convertProductQuantity(produto: any, quantidade: unknown, unidad
 
   return null
 }
+
+export function resolveProductSalePrice(produto: any, unidadeVenda: unknown): number {
+  if (!produto) return 0
+
+  const unidadeSelecionada = String(unidadeVenda || produto.unidade_medida || produto.unidade_estoque || '')
+  const configuredPrice = (produto.precos_venda ?? []).find(
+    (item: any) => item?.ativo !== false && String(item?.unidade_venda ?? '') === unidadeSelecionada,
+  )
+  if (configuredPrice?.preco_unitario != null) {
+    return Number(configuredPrice.preco_unitario ?? 0)
+  }
+
+  const baseUnit = String(produto.unidade_medida || produto.unidade_estoque || unidadeSelecionada)
+  const basePrice = Number(produto.preco_unitario_loja ?? 0)
+  if (!unidadeSelecionada || unidadeSelecionada === baseUnit) return basePrice
+
+  const factor = convertProductQuantity(produto, 1, unidadeSelecionada, baseUnit)
+  if (factor == null) return basePrice
+  return basePrice * factor
+}
+
+export function resolveProductUnitCost(produto: any, unidadeVenda: unknown): number {
+  if (!produto) return 0
+
+  const unidadeSelecionada = String(unidadeVenda || produto.unidade_estoque || '')
+  const baseUnit = String(produto.unidade_estoque || unidadeSelecionada)
+  const baseCost = Number(produto.custo_medio_estoque ?? 0) > 0
+    ? Number(produto.custo_medio_estoque ?? 0)
+    : Number(produto.custo_unitario_fabrica ?? 0)
+
+  if (!unidadeSelecionada || unidadeSelecionada === baseUnit) return baseCost
+
+  const factor = convertProductQuantity(produto, 1, unidadeSelecionada, baseUnit)
+  if (factor == null) return baseCost
+  return baseCost * factor
+}

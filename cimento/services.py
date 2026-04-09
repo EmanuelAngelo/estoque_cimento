@@ -167,7 +167,19 @@ def resolver_preco_venda(produto: Produto, unidade_venda: str, preco_unitario: O
     if preco_configurado is not None:
         return _quantize_money(preco_configurado.preco_unitario)
 
-    if unidade_venda in {produto.unidade_estoque, produto.unidade_medida}:
+    unidade_base_preco = produto.unidade_medida or produto.unidade_estoque
+    if unidade_venda == unidade_base_preco:
+        return _quantize_money(produto.preco_unitario_loja)
+
+    try:
+        quantidade_base = converter_quantidade(produto, Decimal('1'), unidade_venda, unidade_base_preco)
+    except ConversaoUnidadeNaoConfiguradaError:
+        quantidade_base = None
+
+    if quantidade_base is not None and quantidade_base > 0:
+        return _quantize_money(_to_decimal(produto.preco_unitario_loja) * quantidade_base)
+
+    if unidade_venda == produto.unidade_estoque:
         return _quantize_money(produto.preco_unitario_loja)
 
     raise PrecoVendaNaoConfiguradoError(produto_id=produto.id, unidade_venda=unidade_venda)

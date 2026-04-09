@@ -198,7 +198,17 @@ import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppTextarea from '@/components/ui/AppTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { convertProductQuantity, formatBRL, formatDateTime, formatMaterialLabel, formatMaterialMeasure, formatQuantityWithUnit, getUnitLabel } from '@/lib/formatters'
+import {
+  convertProductQuantity,
+  formatBRL,
+  formatDateTime,
+  formatMaterialLabel,
+  formatMaterialMeasure,
+  formatQuantityWithUnit,
+  getUnitLabel,
+  resolveProductSalePrice,
+  resolveProductUnitCost,
+} from '@/lib/formatters'
 
 const tiposSaida = [
   { title: 'Retirada', value: 'RETIRADA' },
@@ -314,8 +324,9 @@ function openDialog() {
   // garante preenchimento do valor unitário na primeira abertura
   const p = produtoSelecionado.value
   if (p && (form.value.valor_unitario_venda == null || form.value.valor_unitario_venda === '')) {
-    form.value.valor_unitario_venda = Number(p.preco_unitario_loja)
-    lastAutoPreco.value = Number(p.preco_unitario_loja)
+    const autoPreco = resolveProductSalePrice(p, form.value.unidade_venda || p.unidade_estoque)
+    form.value.valor_unitario_venda = autoPreco
+    lastAutoPreco.value = autoPreco
   }
   dialogOpen.value = true
 }
@@ -409,10 +420,7 @@ watch(
     const p = produtoSelecionado.value
     if (p) {
       if (!isEditing.value) form.value.unidade_venda = p.unidade_estoque
-      const nextPreco = Number(
-        (p.precos_venda ?? []).find((item: any) => item.unidade_venda === (form.value.unidade_venda || p.unidade_estoque))?.preco_unitario ??
-          p.preco_unitario_loja,
-      )
+      const nextPreco = resolveProductSalePrice(p, form.value.unidade_venda || p.unidade_estoque)
       const curPreco = form.value.valor_unitario_venda
 
       // Atualiza automaticamente quando vazio OU quando ainda estava no "automático" do produto anterior
@@ -429,10 +437,7 @@ watch(
   () => {
     const p = produtoSelecionado.value
     if (!p) return
-    const nextPreco = Number(
-      (p.precos_venda ?? []).find((item: any) => item.unidade_venda === (form.value.unidade_venda || p.unidade_estoque))?.preco_unitario ??
-        p.preco_unitario_loja,
-    )
+    const nextPreco = resolveProductSalePrice(p, form.value.unidade_venda || p.unidade_estoque)
     const curPreco = form.value.valor_unitario_venda
     if (curPreco == null || curPreco === '' || Number(curPreco) === Number(lastAutoPreco.value)) {
       form.value.valor_unitario_venda = nextPreco
@@ -455,8 +460,7 @@ const totalVenda = computed(() => Number(form.value.valor_unitario_venda ?? 0) *
 const custoUnitarioEstimado = computed(() => {
   const p = produtoSelecionado.value
   if (!p) return 0
-  const medio = Number(p.custo_medio_estoque ?? 0)
-  return medio > 0 ? medio : Number(p.custo_unitario_fabrica ?? 0)
+  return resolveProductUnitCost(p, form.value.unidade_venda || p.unidade_estoque)
 })
 
 const totalLucroEstimado = computed(
@@ -471,10 +475,7 @@ async function loadProdutos() {
   // se já tiver produto selecionado, garante valor unitário preenchido
   const p = produtos.value.find((x) => x.id === form.value.produto_id)
   if (p && (form.value.valor_unitario_venda == null || form.value.valor_unitario_venda === '')) {
-    const autoPreco = Number(
-      (p.precos_venda ?? []).find((item: any) => item.unidade_venda === (form.value.unidade_venda || p.unidade_estoque))?.preco_unitario ??
-        p.preco_unitario_loja,
-    )
+    const autoPreco = resolveProductSalePrice(p, form.value.unidade_venda || p.unidade_estoque)
     form.value.valor_unitario_venda = autoPreco
     lastAutoPreco.value = autoPreco
   }
