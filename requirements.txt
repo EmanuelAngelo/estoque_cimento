@@ -1,6 +1,11 @@
-Django>=6.0,<6.1
-djangorestframework>=3.17
-django-filter>=25.2
-django-cors-headers>=4.9
-waitress>=3.0
-reportlab>=4.4
+asgiref==3.11.1
+charset-normalizer==3.4.7
+Django==6.0.4
+django-cors-headers==4.9.0
+django-filter==25.2
+djangorestframework==3.17.1
+pillow==12.2.0
+reportlab==4.4.10
+sqlparse==0.5.5
+tzdata==2026.1
+waitress==3.0.2
