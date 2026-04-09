@@ -10,7 +10,9 @@ from .views import (
     EntradaEstoqueViewSet,
     EstoqueViewSet,
     MovimentacaoEstoqueViewSet,
-    ProdutoCimentoViewSet,
+    OrcamentoPdfView,
+    OrcamentoViewSet,
+    ProdutoViewSet,
     RelatorioPorClienteView,
     RelatorioPorMarcaView,
     RelatorioResumoView,
@@ -18,11 +20,12 @@ from .views import (
 )
 
 router = DefaultRouter()
-router.register('produtos', ProdutoCimentoViewSet)
+router.register('produtos', ProdutoViewSet)
 router.register('estoque', EstoqueViewSet, basename='estoque')
 router.register('entradas', EntradaEstoqueViewSet, basename='entradas')
 router.register('vendas', VendaViewSet, basename='vendas')
 router.register('movimentacoes', MovimentacaoEstoqueViewSet, basename='movimentacoes')
+router.register('orcamentos', OrcamentoViewSet, basename='orcamentos')
 
 urlpatterns = [
 	path('health/', HealthView.as_view(), name='health'),
@@ -33,6 +36,7 @@ urlpatterns = [
     path('relatorios/resumo/', RelatorioResumoView.as_view(), name='relatorio-resumo'),
     path('relatorios/por-cliente/', RelatorioPorClienteView.as_view(), name='relatorio-por-cliente'),
     path('relatorios/por-marca/', RelatorioPorMarcaView.as_view(), name='relatorio-por-marca'),
+    path('orcamentos/<int:pk>/pdf/', OrcamentoPdfView.as_view(), name='orcamento-pdf'),
 ]
 
 urlpatterns += router.urls

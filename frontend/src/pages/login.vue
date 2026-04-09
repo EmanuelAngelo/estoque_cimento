@@ -13,7 +13,7 @@
             </div>
             <div>
               <div class="text-2xl font-bold tracking-tight text-sidebar-foreground">Batatã</div>
-              <p class="text-sm text-sidebar-foreground/65">Gestão interna de estoque e vendas de cimento</p>
+              <p class="text-sm text-sidebar-foreground/65">Gestão interna de estoque, vendas e orçamentos</p>
             </div>
           </div>
 
@@ -81,7 +81,7 @@
               </span>
               <h2 class="text-3xl font-semibold tracking-tight">Entrar na sua conta</h2>
               <p class="text-sm leading-6 text-muted-foreground">
-                Acesse o painel de controle do estoque de cimento com seu usuário e senha.
+                Acesse o painel de controle dos materiais de construção com seu usuário e senha.
               </p>
             </div>
 

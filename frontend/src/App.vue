@@ -3,7 +3,7 @@
     <template v-if="showShell">
       <button
         type="button"
-        class="lg:hidden fixed top-4 left-4 z-50 h-10 w-10 rounded-[var(--radius)] bg-card shadow-sm flex items-center justify-center"
+        class="lg:hidden fixed top-4 left-4 z-50 h-10 w-10 rounded-(--radius) bg-card shadow-sm flex items-center justify-center"
         aria-label="Abrir menu"
         @click="mobileOpen = true"
       >
@@ -25,12 +25,12 @@
       >
         <div class="p-6">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-[var(--radius)] bg-primary flex items-center justify-center">
+            <div class="w-10 h-10 rounded-(--radius) bg-primary flex items-center justify-center">
               <span class="mdi mdi-text-box-check-outline text-xl text-primary-foreground" />
             </div>
             <div>
               <h1 class="text-lg font-bold">Batatã</h1>
-              <p class="text-sm text-sidebar-foreground/60">Gestão de Cimentos</p>
+              <p class="text-sm text-sidebar-foreground/60">Gestão de Materiais</p>
             </div>
           </div>
         </div>
@@ -40,7 +40,7 @@
             v-for="item in navItems"
             :key="item.to"
             :to="item.to"
-            class="flex items-center gap-3 px-4 py-3 rounded-[var(--radius)] transition-colors"
+            class="flex items-center gap-3 px-4 py-3 rounded-(--radius) transition-colors"
             :class="
               isActive(item.to)
                 ? 'bg-primary text-primary-foreground'
@@ -59,7 +59,7 @@
           </div>
           <button
             type="button"
-            class="w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius)] text-sidebar-foreground/80 hover:bg-sidebar-muted hover:text-sidebar-foreground transition-colors"
+            class="w-full flex items-center gap-3 px-4 py-3 rounded-(--radius) text-sidebar-foreground/80 hover:bg-sidebar-muted hover:text-sidebar-foreground transition-colors"
             @click="onLogout"
           >
             <span class="mdi mdi-logout text-xl" />
@@ -100,9 +100,10 @@ const showShell = computed(() => auth.isAuthenticated && route.path !== '/login'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: 'mdi-view-dashboard-outline' },
-  { to: '/produtos', label: 'Produtos', icon: 'mdi-cube-outline' },
+  { to: '/produtos', label: 'Materiais', icon: 'mdi-cube-outline' },
   { to: '/entradas', label: 'Entradas', icon: 'mdi-tray-arrow-down' },
   { to: '/vendas', label: 'Vendas', icon: 'mdi-cart-outline' },
+  { to: '/orcamentos', label: 'Orçamentos', icon: 'mdi-file-document-outline' },
   { to: '/movimentacoes', label: 'Movimentações', icon: 'mdi-swap-horizontal' },
   { to: '/relatorios', label: 'Relatórios', icon: 'mdi-chart-line' },
 ]

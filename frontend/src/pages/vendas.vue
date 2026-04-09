@@ -79,7 +79,7 @@
     <AppModal
       v-model="dialogOpen"
       :title="isEditing ? 'Editar venda' : 'Nova venda'"
-      description="Informe cliente, produto e valores"
+      description="Informe cliente, material e valores"
       max-width="xl"
     >
       <form class="space-y-6" @submit.prevent="save">
@@ -99,27 +99,40 @@
               :items="produtos"
               item-title="label"
               item-value="id"
-              label="Produto"
+              label="Material"
               icon="mdi-package-variant"
               :error="fieldErrors.produto_id?.[0]"
               :disabled="isEditing"
             />
           </div>
-          <div class="md:col-span-1">
+          <div class="md:col-span-2">
             <AppInput
               v-model="form.quantidade"
-              label="Qtd"
+              :label="quantidadeLabel"
               type="number"
-              min="1"
+              min="0.001"
+              step="0.001"
               :error="fieldErrors.quantidade?.[0]"
               :disabled="isEditing"
             />
           </div>
           <div class="md:col-span-2">
-            <AppInput :model-value="String(estoqueAtual)" label="Estoque" readonly />
+            <AppSelect
+              v-model="form.unidade_venda"
+              :items="unidadesVendaDisponiveis"
+              label="Unidade"
+              :error="fieldErrors.unidade_venda?.[0]"
+              :disabled="isEditing"
+            />
           </div>
           <div class="md:col-span-2">
-            <AppInput :model-value="String(estoqueRestante)" label="Restante" readonly :error="!isEditing && estoqueRestante < 0 ? 'Estoque insuficiente' : ''" />
+            <AppInput :model-value="estoqueAtualFormatado" label="Estoque" readonly />
+          </div>
+          <div class="md:col-span-3">
+            <AppInput :model-value="medidaSelecionada" label="Medida do item" readonly />
+          </div>
+          <div class="md:col-span-2">
+            <AppInput :model-value="estoqueRestanteFormatado" label="Restante" readonly :error="!isEditing && estoqueRestante < 0 ? 'Estoque insuficiente' : ''" />
           </div>
           <div class="md:col-span-2">
             <AppSelect
@@ -185,7 +198,7 @@ import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppTextarea from '@/components/ui/AppTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { formatBRL, formatDateTime } from '@/lib/formatters'
+import { convertProductQuantity, formatBRL, formatDateTime, formatMaterialLabel, formatMaterialMeasure, getUnitLabel } from '@/lib/formatters'
 
 const tiposSaida = [
   { title: 'Retirada', value: 'RETIRADA' },
@@ -200,6 +213,7 @@ const form = ref<any>({
   cliente_nome: '',
   produto_id: null,
   quantidade: 1,
+  unidade_venda: null,
   data_venda: new Date().toISOString().slice(0, 16),
   tipo_saida: 'RETIRADA',
   valor_unitario_venda: null,
@@ -233,8 +247,11 @@ function validateForm() {
   if (!form.value.produto_id) {
     errors.produto_id = ['Obrigatório']
   }
-  if (Number(form.value.quantidade ?? 0) < 1) {
-    errors.quantidade = ['Mínimo 1']
+  if (Number(form.value.quantidade ?? 0) <= 0) {
+    errors.quantidade = ['Informe uma quantidade maior que zero']
+  }
+  if (!form.value.unidade_venda) {
+    errors.unidade_venda = ['Obrigatório']
   }
   if (!form.value.tipo_saida) {
     errors.tipo_saida = ['Obrigatório']
@@ -283,6 +300,7 @@ function reset() {
     cliente_nome: '',
     produto_id: produtos.value.length ? produtos.value[0].id : null,
     quantidade: 1,
+    unidade_venda: produtos.value.length ? produtos.value[0].unidade_estoque : null,
     data_venda: new Date().toISOString().slice(0, 16),
     tipo_saida: 'RETIRADA',
     valor_unitario_venda: null,
@@ -309,6 +327,7 @@ function openEdit(it: any) {
     cliente_nome: it.cliente_nome ?? '',
     produto_id: item?.produto?.id ?? null,
     quantidade: item?.quantidade ?? 1,
+    unidade_venda: item?.unidade_venda ?? item?.produto?.unidade_estoque ?? null,
     data_venda: it.data_venda ? new Date(it.data_venda).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
     tipo_saida: it.tipo_saida ?? 'RETIRADA',
     valor_unitario_venda: item?.preco_unitario != null ? Number(item.preco_unitario) : null,
@@ -319,6 +338,13 @@ function openEdit(it: any) {
 }
 
 const produtoSelecionado = computed(() => produtos.value.find((p) => p.id === form.value.produto_id) ?? null)
+const unidadesVendaDisponiveis = computed(() => {
+  const produto = produtoSelecionado.value
+  if (!produto) return []
+  const units = new Set<string>((produto.precos_venda ?? []).filter((item: any) => item.ativo !== false).map((item: any) => String(item.unidade_venda)))
+  if (!units.size) units.add(String(produto.unidade_estoque))
+  return Array.from(units).map((unit) => ({ title: getUnitLabel(unit), value: unit }))
+})
 
 const estoqueAtual = computed(() => {
   const p = produtoSelecionado.value
@@ -326,7 +352,39 @@ const estoqueAtual = computed(() => {
   return Number(p.quantidade_estoque ?? 0)
 })
 
-const estoqueRestante = computed(() => estoqueAtual.value - Number(form.value.quantidade ?? 0))
+const estoqueAtualFormatado = computed(() => {
+  const produto = produtoSelecionado.value
+  if (!produto) return String(estoqueAtual.value)
+  return `${estoqueAtual.value.toFixed(3)} ${getUnitLabel(produto.unidade_estoque)}`
+})
+
+const medidaSelecionada = computed(() => formatMaterialMeasure(produtoSelecionado.value) || '-')
+
+const quantidadeLabel = computed(() => {
+  const produto = produtoSelecionado.value
+  const unidade = form.value.unidade_venda || produto?.unidade_estoque
+  return unidade ? `Qtd (${getUnitLabel(unidade)})` : 'Qtd'
+})
+
+const quantidadeEstoqueConsumida = computed(() => {
+  const produto = produtoSelecionado.value
+  if (!produto) return 0
+  const convertido = convertProductQuantity(
+    produto,
+    Number(form.value.quantidade ?? 0),
+    form.value.unidade_venda || produto.unidade_estoque,
+    produto.unidade_estoque,
+  )
+  return convertido ?? Number(form.value.quantidade ?? 0)
+})
+
+const estoqueRestante = computed(() => estoqueAtual.value - quantidadeEstoqueConsumida.value)
+
+const estoqueRestanteFormatado = computed(() => {
+  const produto = produtoSelecionado.value
+  if (!produto) return String(estoqueRestante.value)
+  return `${estoqueRestante.value.toFixed(3)} ${getUnitLabel(produto.unidade_estoque)}`
+})
 
 const canSubmit = computed(() => {
   if (saving.value) return false
@@ -341,7 +399,11 @@ watch(
   () => {
     const p = produtoSelecionado.value
     if (p) {
-      const nextPreco = Number(p.preco_unitario_loja)
+      if (!isEditing.value) form.value.unidade_venda = p.unidade_estoque
+      const nextPreco = Number(
+        (p.precos_venda ?? []).find((item: any) => item.unidade_venda === (form.value.unidade_venda || p.unidade_estoque))?.preco_unitario ??
+          p.preco_unitario_loja,
+      )
       const curPreco = form.value.valor_unitario_venda
 
       // Atualiza automaticamente quando vazio OU quando ainda estava no "automático" do produto anterior
@@ -350,6 +412,23 @@ watch(
       }
       lastAutoPreco.value = nextPreco
     }
+  },
+)
+
+watch(
+  () => form.value.unidade_venda,
+  () => {
+    const p = produtoSelecionado.value
+    if (!p) return
+    const nextPreco = Number(
+      (p.precos_venda ?? []).find((item: any) => item.unidade_venda === (form.value.unidade_venda || p.unidade_estoque))?.preco_unitario ??
+        p.preco_unitario_loja,
+    )
+    const curPreco = form.value.valor_unitario_venda
+    if (curPreco == null || curPreco === '' || Number(curPreco) === Number(lastAutoPreco.value)) {
+      form.value.valor_unitario_venda = nextPreco
+    }
+    lastAutoPreco.value = nextPreco
   },
 )
 
@@ -376,14 +455,19 @@ const totalLucroEstimado = computed(
 )
 
 async function loadProdutos() {
-  const { data } = await api.get('/produtos/?ativo=true&ordering=marca,nome_produto')
-  produtos.value = data.map((p: any) => ({ ...p, label: `${p.marca} - ${p.nome_produto}` }))
+  const { data } = await api.get('/produtos/?ativo=true&ordering=tipo_material,nome_produto')
+  produtos.value = data.map((p: any) => ({ ...p, label: formatMaterialLabel(p) }))
   if (!form.value.produto_id && produtos.value.length) form.value.produto_id = produtos.value[0].id
+  if (!form.value.unidade_venda && produtos.value.length) form.value.unidade_venda = produtos.value[0].unidade_estoque
   // se já tiver produto selecionado, garante valor unitário preenchido
   const p = produtos.value.find((x) => x.id === form.value.produto_id)
   if (p && (form.value.valor_unitario_venda == null || form.value.valor_unitario_venda === '')) {
-    form.value.valor_unitario_venda = Number(p.preco_unitario_loja)
-    lastAutoPreco.value = Number(p.preco_unitario_loja)
+    const autoPreco = Number(
+      (p.precos_venda ?? []).find((item: any) => item.unidade_venda === (form.value.unidade_venda || p.unidade_estoque))?.preco_unitario ??
+        p.preco_unitario_loja,
+    )
+    form.value.valor_unitario_venda = autoPreco
+    lastAutoPreco.value = autoPreco
   }
 }
 
@@ -414,7 +498,8 @@ async function save() {
   // Normalize payload to the serializer expectations
   payload.cliente_nome = String(payload.cliente_nome ?? '').trim()
   payload.produto_id = payload.produto_id != null ? Number(payload.produto_id) : null
-  payload.quantidade = payload.quantidade != null ? Number(payload.quantidade) : payload.quantidade
+  payload.quantidade = payload.quantidade != null ? String(payload.quantidade) : payload.quantidade
+  payload.unidade_venda = payload.unidade_venda || produtoSelecionado.value?.unidade_estoque
   if (payload.data_venda) {
     const dt = new Date(payload.data_venda)
     if (!Number.isNaN(dt.getTime())) payload.data_venda = dt.toISOString()

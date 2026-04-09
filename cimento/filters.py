@@ -9,10 +9,11 @@ class VendaFilter(django_filters.FilterSet):
     cliente = django_filters.CharFilter(field_name='cliente_nome', lookup_expr='icontains')
     tipo_saida = django_filters.CharFilter(field_name='tipo_saida', lookup_expr='exact')
     marca = django_filters.CharFilter(field_name='itens__produto__marca', lookup_expr='exact')
+    tipo_material = django_filters.CharFilter(field_name='itens__produto__tipo_material', lookup_expr='exact')
 
     class Meta:
         model = Venda
-        fields = ['data_inicial', 'data_final', 'cliente', 'tipo_saida', 'marca']
+        fields = ['data_inicial', 'data_final', 'cliente', 'tipo_saida', 'marca', 'tipo_material']
 
 
 class MovimentacaoFilter(django_filters.FilterSet):

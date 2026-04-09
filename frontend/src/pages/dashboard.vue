@@ -108,20 +108,20 @@
           <table class="app-table">
             <thead>
               <tr>
-                <th>Produto</th>
-                <th>Marca</th>
+                <th>Material</th>
+                <th>Tipo</th>
                 <th class="text-right">Qtd</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="e in estoqueBaixo" :key="e.produto?.id ?? e.id">
-                <td class="font-medium">{{ e.produto?.nome_produto }}</td>
-                <td class="text-muted-foreground">{{ e.produto?.marca }}</td>
+                <td class="font-medium">{{ formatMaterialLabel(e.produto) }}</td>
+                <td class="text-muted-foreground">{{ e.produto?.tipo_material_label }}</td>
                 <td class="text-right font-medium">{{ e.quantidade_atual }}</td>
               </tr>
               <tr v-if="!estoqueBaixo.length">
                 <td colspan="3">
-                  <EmptyState icon="mdi-warehouse" title="Tudo certo" description="Nenhum produto está com estoque baixo." />
+                  <EmptyState icon="mdi-warehouse" title="Tudo certo" description="Nenhum material está com estoque baixo." />
                 </td>
               </tr>
             </tbody>
@@ -140,7 +140,7 @@ import AppSpinner from '@/components/ui/AppSpinner.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { formatBRL, formatDateTime } from '@/lib/formatters'
+import { formatBRL, formatDateTime, formatMaterialLabel } from '@/lib/formatters'
 
 const dashboard = ref<any>(null)
 const loading = ref(false)

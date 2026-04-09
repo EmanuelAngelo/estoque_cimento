@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from django.http import FileResponse
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.functions import Coalesce
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authtoken.models import Token
@@ -9,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .filters import MovimentacaoFilter, VendaFilter
-from .models import EntradaEstoque, Estoque, ItemVenda, MovimentacaoEstoque, ProdutoCimento, Venda
+from .models import EntradaEstoque, Estoque, ItemVenda, MovimentacaoEstoque, Orcamento, Produto, Venda
 from .serializers import (
 	AuthLoginSerializer,
 	EntradaEstoqueCreateSerializer,
@@ -17,14 +19,16 @@ from .serializers import (
 	EntradaEstoqueSerializer,
 	EstoqueSerializer,
 	MovimentacaoEstoqueSerializer,
-	ProdutoCimentoSerializer,
+	OrcamentoCreateSerializer,
+	OrcamentoSerializer,
+	ProdutoSerializer,
 	UserMeSerializer,
 	VendaCreateSerializer,
 	VendaUpdateSerializer,
 	VendaSerializer,
 )
 
-from .services import atualizar_venda_metadata, cancelar_entrada, cancelar_venda
+from .services import atualizar_venda_metadata, cancelar_entrada, cancelar_venda, gerar_pdf_orcamento
 
 
 class AuthLoginView(APIView):
@@ -64,7 +68,11 @@ class HealthView(APIView):
 
 class DashboardView(APIView):
 	def get(self, request):
-		total_qtd = Estoque.objects.aggregate(total=Coalesce(Sum('quantidade_atual'), 0))['total']
+		quantity_field = DecimalField(max_digits=20, decimal_places=6)
+		quantity_zero = Value(0, output_field=quantity_field)
+		total_qtd = Estoque.objects.aggregate(
+			total=Coalesce(Sum('quantidade_atual'), quantity_zero, output_field=quantity_field)
+		)['total']
 
 		money_field = DecimalField(max_digits=20, decimal_places=2)
 		money_zero = Value(0, output_field=money_field)
@@ -123,18 +131,18 @@ class DashboardView(APIView):
 		)
 
 
-class ProdutoCimentoViewSet(viewsets.ModelViewSet):
-	queryset = ProdutoCimento.objects.select_related('estoque').all()
-	serializer_class = ProdutoCimentoSerializer
-	filterset_fields = ['marca', 'ativo']
+class ProdutoViewSet(viewsets.ModelViewSet):
+	queryset = Produto.objects.select_related('estoque').prefetch_related('conversoes_unidade', 'precos_venda').all()
+	serializer_class = ProdutoSerializer
+	filterset_fields = ['tipo_material', 'marca', 'ativo', 'unidade_medida']
 	search_fields = ['nome_produto', 'descricao_produto']
-	ordering_fields = ['marca', 'nome_produto', 'preco_unitario_loja', 'custo_unitario_fabrica', 'id']
+	ordering_fields = ['tipo_material', 'marca', 'nome_produto', 'preco_unitario_loja', 'custo_unitario_fabrica', 'id']
 
 
 class EstoqueViewSet(viewsets.ReadOnlyModelViewSet):
-	queryset = Estoque.objects.select_related('produto').all()
+	queryset = Estoque.objects.select_related('produto').prefetch_related('produto__conversoes_unidade', 'produto__precos_venda').all()
 	serializer_class = EstoqueSerializer
-	filterset_fields = ['produto__marca', 'produto__ativo']
+	filterset_fields = ['produto__tipo_material', 'produto__marca', 'produto__ativo']
 	ordering_fields = ['quantidade_atual', 'updated_at', 'id']
 
 
@@ -153,11 +161,18 @@ class EntradaEstoqueViewSet(viewsets.ModelViewSet):
 	def perform_destroy(self, instance):
 		cancelar_entrada(entrada=instance, usuario=self.request.user)
 
+	def create(self, request, *args, **kwargs):
+		serializer = self.get_serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		entrada = serializer.save()
+		response_serializer = EntradaEstoqueSerializer(entrada)
+		return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
 
 class VendaViewSet(viewsets.ModelViewSet):
 	queryset = (
 		Venda.objects.select_related('usuario_responsavel')
-		.prefetch_related('itens', 'itens__produto')
+		.prefetch_related('itens', 'itens__produto', 'itens__produto__conversoes_unidade', 'itens__produto__precos_venda')
 		.filter(cancelada=False)
 	)
 	http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
@@ -195,6 +210,43 @@ class MovimentacaoEstoqueViewSet(viewsets.ReadOnlyModelViewSet):
 	serializer_class = MovimentacaoEstoqueSerializer
 	filterset_class = MovimentacaoFilter
 	ordering_fields = ['data_movimentacao', 'id']
+
+
+class OrcamentoViewSet(viewsets.ModelViewSet):
+	queryset = (
+		Orcamento.objects.select_related('usuario_responsavel')
+		.prefetch_related('itens', 'itens__produto', 'itens__produto__conversoes_unidade', 'itens__produto__precos_venda')
+		.all()
+	)
+	http_method_names = ['get', 'post', 'delete', 'head', 'options']
+	ordering_fields = ['data_orcamento', 'valor_total', 'id']
+
+	def get_serializer_class(self):
+		if self.action == 'create':
+			return OrcamentoCreateSerializer
+		return OrcamentoSerializer
+
+	def create(self, request, *args, **kwargs):
+		serializer = self.get_serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		orcamento = serializer.save()
+		response_serializer = OrcamentoSerializer(orcamento)
+		return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class OrcamentoPdfView(APIView):
+	def get(self, request, pk: int):
+		orcamento = get_object_or_404(
+			Orcamento.objects.select_related('usuario_responsavel').prefetch_related(
+				'itens',
+				'itens__produto',
+				'itens__produto__conversoes_unidade',
+				'itens__produto__precos_venda',
+			),
+			pk=pk,
+		)
+		pdf_buffer = gerar_pdf_orcamento(orcamento)
+		return FileResponse(pdf_buffer, as_attachment=True, filename=f'orcamento-{orcamento.id}.pdf')
 
 
 class RelatorioResumoView(APIView):

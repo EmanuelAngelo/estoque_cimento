@@ -13,6 +13,7 @@ import Dashboard from '@/pages/dashboard.vue'
 import Produtos from '@/pages/produtos.vue'
 import Entradas from '@/pages/entradas.vue'
 import Vendas from '@/pages/vendas.vue'
+import Orcamentos from '@/pages/orcamentos.vue'
 import Movimentacoes from '@/pages/movimentacoes.vue'
 import Relatorios from '@/pages/relatorios.vue'
 
@@ -45,6 +46,11 @@ const router = createRouter({
     {
       path: '/vendas',
       component: Vendas,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/orcamentos',
+      component: Orcamentos,
       meta: { requiresAuth: true },
     },
     {

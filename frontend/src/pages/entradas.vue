@@ -22,8 +22,8 @@
           <thead>
             <tr>
               <th>Data</th>
-              <th>Produto</th>
-              <th>Marca</th>
+              <th>Material</th>
+              <th>Tipo</th>
               <th class="text-right">Qtd</th>
               <th class="text-right">Custo</th>
               <th>Usuário</th>
@@ -33,8 +33,8 @@
           <tbody>
             <tr v-for="it in items" :key="it.id">
               <td class="text-muted-foreground">{{ formatDate(it.data_entrada) }}</td>
-              <td class="font-medium">{{ it.produto?.nome_produto }}</td>
-              <td class="text-muted-foreground">{{ it.produto?.marca }}</td>
+              <td class="font-medium">{{ formatMaterialLabel(it.produto) }}</td>
+              <td class="text-muted-foreground">{{ it.produto?.tipo_material_label }}</td>
               <td class="text-right font-medium">{{ it.quantidade }}</td>
               <td class="text-right">{{ formatBRL(it.custo_unitario_fabrica) }}</td>
               <td class="text-muted-foreground">{{ it.usuario_responsavel }}</td>
@@ -62,7 +62,7 @@
                 <EmptyState
                   icon="mdi-tray-arrow-down"
                   title="Sem entradas"
-                  description="Clique em 'Nova entrada' para registrar um recebimento."
+                  description="Clique em 'Nova entrada' para registrar um recebimento de material."
                 />
               </td>
             </tr>
@@ -85,13 +85,28 @@
               :items="produtos"
               item-title="label"
               item-value="id"
-              label="Produto"
+              label="Material"
               :disabled="isEditing"
               icon="mdi-package-variant"
             />
           </div>
           <div class="md:col-span-2">
-            <AppInput v-model="form.quantidade" label="Quantidade" type="number" :disabled="isEditing" min="1" />
+            <AppSelect
+              v-model="form.unidade_entrada"
+              :items="unidadesEntradaDisponiveis"
+              label="Unidade entrada"
+              :disabled="isEditing"
+            />
+          </div>
+          <div class="md:col-span-2">
+            <AppInput
+              v-model="form.quantidade"
+              :label="quantidadeLabel"
+              type="number"
+              :disabled="isEditing"
+              min="0.001"
+              step="0.001"
+            />
           </div>
           <div class="md:col-span-2">
             <AppInput
@@ -106,10 +121,13 @@
           <div class="md:col-span-2">
             <AppInput v-model="form.data_entrada" label="Data" type="date" />
           </div>
+          <div class="md:col-span-2">
+            <AppInput :model-value="quantidadeEstoquePrevista" label="Baixa no estoque" readonly />
+          </div>
           <div class="md:col-span-4">
             <AppInput v-model="form.fornecedor" label="Fornecedor (opcional)" placeholder="Nome do fornecedor" />
           </div>
-          <div class="md:col-span-8">
+          <div class="md:col-span-6">
             <AppTextarea v-model="form.observacao" label="Observação (opcional)" :rows="2" />
           </div>
         </div>
@@ -134,7 +152,7 @@ import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppTextarea from '@/components/ui/AppTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { formatBRL, formatDate } from '@/lib/formatters'
+import { convertProductQuantity, formatBRL, formatDate, formatMaterialLabel, getUnitLabel } from '@/lib/formatters'
 
 const produtos = ref<any[]>([])
 const items = ref<any[]>([])
@@ -157,6 +175,35 @@ const isEditing = computed(() => editingId.value != null)
 
 const lastAutoCost = ref<number | null>(null)
 const produtoSelecionado = computed(() => produtos.value.find((p) => p.id === form.value.produto_id) ?? null)
+const unidadesEntradaDisponiveis = computed(() => {
+  const produto = produtoSelecionado.value
+  if (!produto) return []
+  const baseUnit = String(produto.unidade_estoque)
+  const units = new Set<string>([baseUnit])
+  for (const conversao of produto.conversoes_unidade ?? []) {
+    if (String(conversao.unidade_destino) === baseUnit) units.add(String(conversao.unidade_origem))
+  }
+  return Array.from(units).map((unit) => ({ title: getUnitLabel(unit), value: unit }))
+})
+
+const quantidadeEstoquePrevista = computed(() => {
+  const produto = produtoSelecionado.value
+  if (!produto) return '-'
+  const converted = convertProductQuantity(
+    produto,
+    Number(form.value.quantidade ?? 0),
+    form.value.unidade_entrada || produto.unidade_estoque,
+    produto.unidade_estoque,
+  )
+  if (converted == null) return '-'
+  return `${converted.toFixed(3)} ${getUnitLabel(produto.unidade_estoque)}`
+})
+
+const quantidadeLabel = computed(() => {
+  const produto = produtoSelecionado.value
+  const unidade = form.value.unidade_entrada || produto?.unidade_estoque
+  return unidade ? `Quantidade (${getUnitLabel(unidade)})` : 'Quantidade'
+})
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -183,6 +230,7 @@ function reset() {
   lastAutoCost.value = null
   form.value = {
     produto_id: produtos.value.length ? produtos.value[0].id : null,
+    unidade_entrada: produtos.value.length ? produtos.value[0].unidade_estoque : null,
     quantidade: 1,
     custo_unitario_fabrica: null,
     data_entrada: new Date().toISOString().slice(0, 10),
@@ -202,6 +250,7 @@ function openEdit(it: any) {
   editingId.value = it.id
   form.value = {
     produto_id: it.produto?.id ?? null,
+    unidade_entrada: it.unidade_entrada ?? it.produto?.unidade_estoque ?? null,
     quantidade: it.quantidade,
     custo_unitario_fabrica: it.custo_unitario_fabrica,
     data_entrada: it.data_entrada,
@@ -218,15 +267,20 @@ function closeDialog() {
 }
 
 async function loadProdutos() {
-  const { data } = await api.get('/produtos/?ativo=true&ordering=marca,nome_produto')
-  produtos.value = data.map((p: any) => ({ ...p, label: `${p.marca} - ${p.nome_produto}` }))
+  const { data } = await api.get('/produtos/?ativo=true&ordering=tipo_material,nome_produto')
+  produtos.value = data.map((p: any) => ({ ...p, label: formatMaterialLabel(p) }))
   if (!form.value.produto_id && produtos.value.length) form.value.produto_id = produtos.value[0].id
+  if (!form.value.unidade_entrada && produtos.value.length) form.value.unidade_entrada = produtos.value[0].unidade_estoque
   applyAutoCost()
 }
 
 watch(
   () => form.value.produto_id,
-  () => applyAutoCost(),
+  () => {
+    const produto = produtoSelecionado.value
+    if (produto && !isEditing.value) form.value.unidade_entrada = produto.unidade_estoque
+    applyAutoCost()
+  },
 )
 
 async function loadEntradas(minDurationMs = 0) {
@@ -254,7 +308,8 @@ async function save() {
     } else {
       const payload: any = { ...form.value }
       payload.produto_id = payload.produto_id != null ? Number(payload.produto_id) : null
-      payload.quantidade = payload.quantidade != null ? Number(payload.quantidade) : payload.quantidade
+      payload.quantidade = payload.quantidade != null ? String(payload.quantidade) : payload.quantidade
+      payload.unidade_entrada = payload.unidade_entrada || produtoSelecionado.value?.unidade_estoque
       if (payload.custo_unitario_fabrica == null || payload.custo_unitario_fabrica === '') {
         delete payload.custo_unitario_fabrica
       } else {

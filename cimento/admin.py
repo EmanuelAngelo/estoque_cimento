@@ -3,18 +3,44 @@ from django.contrib import admin
 from .models import (
 	EntradaEstoque,
 	Estoque,
+	ItemOrcamento,
 	ItemVenda,
 	MovimentacaoEstoque,
-	ProdutoCimento,
+	Orcamento,
+	Produto,
+	ProdutoConversaoUnidade,
+	ProdutoPrecoVenda,
 	Venda,
 )
 
 
-@admin.register(ProdutoCimento)
-class ProdutoCimentoAdmin(admin.ModelAdmin):
-	list_display = ('id', 'marca', 'nome_produto', 'peso_kg', 'custo_unitario_fabrica', 'preco_unitario_loja', 'ativo')
-	list_filter = ('marca', 'ativo')
+class ProdutoConversaoUnidadeInline(admin.TabularInline):
+	model = ProdutoConversaoUnidade
+	extra = 0
+
+
+class ProdutoPrecoVendaInline(admin.TabularInline):
+	model = ProdutoPrecoVenda
+	extra = 0
+
+
+@admin.register(Produto)
+class ProdutoAdmin(admin.ModelAdmin):
+	list_display = (
+		'id',
+		'tipo_material',
+		'marca',
+		'nome_produto',
+		'unidade_estoque',
+		'unidade_medida',
+		'quantidade_por_unidade',
+		'custo_unitario_fabrica',
+		'preco_unitario_loja',
+		'ativo',
+	)
+	list_filter = ('tipo_material', 'marca', 'ativo', 'unidade_estoque', 'unidade_medida')
 	search_fields = ('nome_produto', 'descricao_produto')
+	inlines = [ProdutoConversaoUnidadeInline, ProdutoPrecoVendaInline]
 
 
 @admin.register(Estoque)
@@ -25,12 +51,27 @@ class EstoqueAdmin(admin.ModelAdmin):
 
 @admin.register(EntradaEstoque)
 class EntradaEstoqueAdmin(admin.ModelAdmin):
-	list_display = ('id', 'produto', 'quantidade', 'custo_unitario_fabrica', 'data_entrada', 'usuario_responsavel')
+	list_display = (
+		'id',
+		'produto',
+		'quantidade',
+		'unidade_entrada',
+		'quantidade_estoque',
+		'custo_unitario_fabrica',
+		'custo_total',
+		'data_entrada',
+		'usuario_responsavel',
+	)
 	list_filter = ('data_entrada', 'produto__marca')
 
 
 class ItemVendaInline(admin.TabularInline):
 	model = ItemVenda
+	extra = 0
+
+
+class ItemOrcamentoInline(admin.TabularInline):
+	model = ItemOrcamento
 	extra = 0
 
 
@@ -48,6 +89,13 @@ class VendaAdmin(admin.ModelAdmin):
 	list_filter = ('tipo_saida',)
 	search_fields = ('cliente_nome',)
 	inlines = [ItemVendaInline]
+
+
+@admin.register(Orcamento)
+class OrcamentoAdmin(admin.ModelAdmin):
+	list_display = ('id', 'cliente_nome', 'data_orcamento', 'valor_total', 'validade_dias', 'usuario_responsavel')
+	search_fields = ('cliente_nome',)
+	inlines = [ItemOrcamentoInline]
 
 
 @admin.register(MovimentacaoEstoque)
