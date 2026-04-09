@@ -239,7 +239,7 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { formatBRL, formatMaterialMeasure } from '@/lib/formatters'
+import { formatBRL, formatMaterialMeasure, getUnitLabel } from '@/lib/formatters'
 
 const tipoMaterialOptions = [
   { title: 'Cimento', value: 'CIMENTO' },
@@ -285,6 +285,10 @@ const measureFieldLabel = computed(() => {
       return 'Medida por item'
   }
 })
+
+function getQuantidadeStep() {
+  return form.value.unidade_estoque === 'UNIDADE' ? '1' : '0.001'
+}
 
 function createConversionRow(data: Record<string, any> = {}) {
   return {

@@ -198,7 +198,7 @@ import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppTextarea from '@/components/ui/AppTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { convertProductQuantity, formatBRL, formatDateTime, formatMaterialLabel, formatMaterialMeasure, getUnitLabel } from '@/lib/formatters'
+import { convertProductQuantity, formatBRL, formatDateTime, formatMaterialLabel, formatMaterialMeasure, formatQuantityWithUnit, getUnitLabel } from '@/lib/formatters'
 
 const tiposSaida = [
   { title: 'Retirada', value: 'RETIRADA' },
@@ -341,8 +341,17 @@ const produtoSelecionado = computed(() => produtos.value.find((p) => p.id === fo
 const unidadesVendaDisponiveis = computed(() => {
   const produto = produtoSelecionado.value
   if (!produto) return []
-  const units = new Set<string>((produto.precos_venda ?? []).filter((item: any) => item.ativo !== false).map((item: any) => String(item.unidade_venda)))
-  if (!units.size) units.add(String(produto.unidade_estoque))
+  const units = new Set<string>([String(produto.unidade_estoque)])
+  if (produto.unidade_medida) units.add(String(produto.unidade_medida))
+  for (const item of produto.precos_venda ?? []) {
+    if (item?.ativo !== false && item?.unidade_venda) units.add(String(item.unidade_venda))
+  }
+  for (const conversao of produto.conversoes_unidade ?? []) {
+    const origem = String(conversao?.unidade_origem ?? '')
+    const destino = String(conversao?.unidade_destino ?? '')
+    if (origem) units.add(origem)
+    if (destino) units.add(destino)
+  }
   return Array.from(units).map((unit) => ({ title: getUnitLabel(unit), value: unit }))
 })
 
@@ -355,7 +364,7 @@ const estoqueAtual = computed(() => {
 const estoqueAtualFormatado = computed(() => {
   const produto = produtoSelecionado.value
   if (!produto) return String(estoqueAtual.value)
-  return `${estoqueAtual.value.toFixed(3)} ${getUnitLabel(produto.unidade_estoque)}`
+  return formatQuantityWithUnit(estoqueAtual.value, produto.unidade_estoque, 3)
 })
 
 const medidaSelecionada = computed(() => formatMaterialMeasure(produtoSelecionado.value) || '-')
@@ -383,7 +392,7 @@ const estoqueRestante = computed(() => estoqueAtual.value - quantidadeEstoqueCon
 const estoqueRestanteFormatado = computed(() => {
   const produto = produtoSelecionado.value
   if (!produto) return String(estoqueRestante.value)
-  return `${estoqueRestante.value.toFixed(3)} ${getUnitLabel(produto.unidade_estoque)}`
+  return formatQuantityWithUnit(estoqueRestante.value, produto.unidade_estoque, 3)
 })
 
 const canSubmit = computed(() => {

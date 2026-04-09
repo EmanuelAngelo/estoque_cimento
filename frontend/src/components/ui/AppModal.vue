@@ -1,8 +1,11 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
+    <div v-if="modelValue" class="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6">
       <div class="absolute inset-0 bg-black/45 backdrop-blur-[1px]" @click="emit('update:modelValue', false)" />
-      <div class="relative z-10 w-full overflow-hidden rounded-[calc(var(--radius)+0.25rem)] border border-border bg-card shadow-[0_24px_80px_-32px_rgba(15,23,42,0.5)]" :class="maxWidthClass">
+      <div
+        class="relative z-10 flex w-full max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[calc(var(--radius)+0.25rem)] border border-border bg-card shadow-[0_24px_80px_-32px_rgba(15,23,42,0.5)] sm:max-h-[calc(100vh-3rem)]"
+        :class="maxWidthClass"
+      >
         <div class="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
             <h2 class="text-lg font-semibold text-foreground">{{ title }}</h2>
@@ -16,7 +19,7 @@
             <span class="mdi mdi-close text-xl" />
           </button>
         </div>
-        <div class="p-6">
+        <div class="overflow-y-auto p-6">
           <slot />
         </div>
       </div>

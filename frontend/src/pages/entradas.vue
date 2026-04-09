@@ -35,7 +35,7 @@
               <td class="text-muted-foreground">{{ formatDate(it.data_entrada) }}</td>
               <td class="font-medium">{{ formatMaterialLabel(it.produto) }}</td>
               <td class="text-muted-foreground">{{ it.produto?.tipo_material_label }}</td>
-              <td class="text-right font-medium">{{ it.quantidade }}</td>
+              <td class="text-right font-medium">{{ formatQuantidadeEntrada(it) }}</td>
               <td class="text-right">{{ formatBRL(it.custo_unitario_fabrica) }}</td>
               <td class="text-muted-foreground">{{ it.usuario_responsavel }}</td>
               <td class="text-right">
@@ -152,7 +152,7 @@ import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppTextarea from '@/components/ui/AppTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { convertProductQuantity, formatBRL, formatDate, formatMaterialLabel, getUnitLabel } from '@/lib/formatters'
+import { convertProductQuantity, formatBRL, formatDate, formatMaterialLabel, formatQuantityWithUnit, getUnitLabel } from '@/lib/formatters'
 
 const produtos = ref<any[]>([])
 const items = ref<any[]>([])
@@ -196,7 +196,7 @@ const quantidadeEstoquePrevista = computed(() => {
     produto.unidade_estoque,
   )
   if (converted == null) return '-'
-  return `${converted.toFixed(3)} ${getUnitLabel(produto.unidade_estoque)}`
+  return formatQuantityWithUnit(converted, produto.unidade_estoque, 3)
 })
 
 const quantidadeLabel = computed(() => {
@@ -204,6 +204,10 @@ const quantidadeLabel = computed(() => {
   const unidade = form.value.unidade_entrada || produto?.unidade_estoque
   return unidade ? `Quantidade (${getUnitLabel(unidade)})` : 'Quantidade'
 })
+
+function formatQuantidadeEntrada(item: any) {
+  return formatQuantityWithUnit(item?.quantidade, item?.unidade_entrada || item?.produto?.unidade_estoque)
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))

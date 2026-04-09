@@ -28,24 +28,40 @@ export function formatMaterialMeasure(produto: any): string {
   const quantidade = Number(produto.quantidade_por_unidade ?? 0)
   const unidade = String(produto.unidade_medida_label || produto.unidade_medida || '').trim()
   if (!quantidade && !unidade) return ''
-  if (!unidade) return String(quantidade)
-  return `${quantidade} ${unidade}`.trim()
+  if (!unidade) return formatQuantity(quantidade)
+  return formatQuantityWithUnit(quantidade, produto.unidade_medida_label || produto.unidade_medida)
 }
 
-const unitLabelMap: Record<string, string> = {
-  KG: 'Kg',
-  UNIDADE: 'Unidade',
-  LATA: 'Lata',
-  MILHEIRO: 'Milheiro',
-  CARRADA: 'Carrada',
-  METRO: 'Metro',
-  METRO_QUADRADO: 'Metro quadrado',
-  METRO_CUBICO: 'Metro cúbico',
-  PACOTE: 'Pacote',
+const unitLabelMap: Record<string, { singular: string; plural: string }> = {
+  KG: { singular: 'Kg', plural: 'Kg' },
+  UNIDADE: { singular: 'Unidade', plural: 'Unidades' },
+  LATA: { singular: 'Lata', plural: 'Latas' },
+  MILHEIRO: { singular: 'Milheiro', plural: 'Milheiros' },
+  CARRADA: { singular: 'Carrada', plural: 'Carradas' },
+  METRO: { singular: 'Metro', plural: 'Metros' },
+  METRO_QUADRADO: { singular: 'Metro quadrado', plural: 'Metros quadrados' },
+  METRO_CUBICO: { singular: 'Metro cúbico', plural: 'Metros cúbicos' },
+  PACOTE: { singular: 'Pacote', plural: 'Pacotes' },
 }
 
-export function getUnitLabel(unit: unknown): string {
-  return unitLabelMap[String(unit ?? '')] ?? String(unit ?? '')
+export function formatQuantity(value: unknown, maximumFractionDigits = 6): string {
+  const n = Number(value ?? 0)
+  if (!Number.isFinite(n)) return '0'
+  return n.toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  })
+}
+
+export function getUnitLabel(unit: unknown, quantity?: unknown): string {
+  const entry = unitLabelMap[String(unit ?? '')]
+  if (!entry) return String(unit ?? '')
+  if (quantity == null) return entry.singular
+  return Number(quantity) === 1 ? entry.singular : entry.plural
+}
+
+export function formatQuantityWithUnit(value: unknown, unit: unknown, maximumFractionDigits = 6): string {
+  return `${formatQuantity(value, maximumFractionDigits)} ${getUnitLabel(unit, value)}`.trim()
 }
 
 export function convertProductQuantity(produto: any, quantidade: unknown, unidadeOrigem: unknown, unidadeDestino: unknown): number | null {
