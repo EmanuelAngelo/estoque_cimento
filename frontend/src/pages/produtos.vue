@@ -7,6 +7,13 @@
       </template>
     </PageHeader>
 
+    <div class="mb-4 space-y-3">
+      <AppAlert variant="info">
+        Excluir remove da base apenas materiais sem histórico. Se já houver entradas, vendas, movimentações ou orçamentos, o sistema inativa o cadastro e avisa o motivo.
+      </AppAlert>
+      <AppAlert v-if="pageFeedback" :variant="pageFeedback.variant">{{ pageFeedback.message }}</AppAlert>
+    </div>
+
     <div class="app-card overflow-hidden">
       <div class="app-card-header">
         <div>
@@ -62,9 +69,11 @@
                   type="button"
                   class="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Excluir"
+                  :title="deleteButtonTitle(item)"
+                  :disabled="deletingId === item.id"
                   @click="remove(item)"
                 >
-                  <span class="mdi mdi-trash-can-outline text-lg" />
+                  <span :class="['mdi text-lg', deletingId === item.id ? 'mdi-loading mdi-spin' : 'mdi-trash-can-outline']" />
                 </button>
                 <button
                   type="button"
@@ -232,6 +241,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import api from '@/api/client'
+import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppModal from '@/components/ui/AppModal.vue'
@@ -273,6 +283,8 @@ const saving = ref(false)
 const dialogOpen = ref(false)
 const form = ref<any>({})
 const hydratingForm = ref(false)
+const deletingId = ref<number | null>(null)
+const pageFeedback = ref<{ variant: 'info' | 'success' | 'warning' | 'error'; message: string } | null>(null)
 
 const isCimento = computed(() => form.value.tipo_material === 'CIMENTO')
 const measureFieldLabel = computed(() => {
@@ -440,6 +452,25 @@ async function load(minDurationMs = 0) {
   }
 }
 
+function deleteButtonTitle(item: any) {
+  if (item?.ativo === false) {
+    return 'Este material já está inativo. Se houver histórico, ele não pode ser apagado fisicamente.'
+  }
+  return 'Exclui da base apenas se não houver histórico. Caso contrário, o material será inativado para preservar entradas, vendas e orçamentos.'
+}
+
+function getApiMessage(data: any, fallback: string) {
+  if (!data) return fallback
+  if (typeof data === 'string') return data
+  if (typeof data?.detail === 'string') return data.detail
+  if (Array.isArray(data?.non_field_errors) && data.non_field_errors.length) return String(data.non_field_errors[0])
+  for (const value of Object.values(data)) {
+    if (Array.isArray(value) && value.length) return String(value[0])
+    if (typeof value === 'string') return value
+  }
+  return fallback
+}
+
 function openCreate() {
   reset()
   dialogOpen.value = true
@@ -495,14 +526,33 @@ async function save() {
 }
 
 async function toggleAtivo(item: any) {
+  pageFeedback.value = null
   await api.patch(`/produtos/${item.id}/`, { ativo: !item.ativo })
   await load(2000)
 }
 
 async function remove(item: any) {
-  if (!confirm('Excluir este material? Pode falhar se já houver entradas ou vendas.')) return
-  await api.delete(`/produtos/${item.id}/`)
-  await load(2000)
+  pageFeedback.value = null
+  if (!confirm('Excluir este material? Se já houver histórico, ele será apenas inativado para preservar os registros.')) return
+
+  deletingId.value = item.id
+  try {
+    const response = await api.delete(`/produtos/${item.id}/`)
+    const action = response?.data?.action
+    const detail = getApiMessage(response?.data, 'Material removido com sucesso.')
+    pageFeedback.value = {
+      variant: action === 'deleted' ? 'success' : 'warning',
+      message: detail,
+    }
+    await load(2000)
+  } catch (error: any) {
+    pageFeedback.value = {
+      variant: 'error',
+      message: getApiMessage(error?.response?.data, 'Não foi possível excluir o material.'),
+    }
+  } finally {
+    deletingId.value = null
+  }
 }
 
 watch(

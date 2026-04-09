@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.http import FileResponse
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
+from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -137,6 +138,55 @@ class ProdutoViewSet(viewsets.ModelViewSet):
 	filterset_fields = ['tipo_material', 'marca', 'ativo', 'unidade_medida']
 	search_fields = ['nome_produto', 'descricao_produto']
 	ordering_fields = ['tipo_material', 'marca', 'nome_produto', 'preco_unitario_loja', 'custo_unitario_fabrica', 'id']
+
+	@staticmethod
+	def _format_protected_references(exc: ProtectedError):
+		labels = {
+			'EntradaEstoque': 'entradas',
+			'ItemVenda': 'vendas',
+			'MovimentacaoEstoque': 'movimentações',
+			'ItemOrcamento': 'orçamentos',
+		}
+		references = sorted({labels.get(obj.__class__.__name__, obj.__class__.__name__) for obj in exc.protected_objects})
+		if not references:
+			return 'histórico vinculado'
+		if len(references) == 1:
+			return references[0]
+		if len(references) == 2:
+			return f'{references[0]} e {references[1]}'
+		return f"{', '.join(references[:-1])} e {references[-1]}"
+
+	def destroy(self, request, *args, **kwargs):
+		instance = self.get_object()
+		try:
+			instance.delete()
+		except ProtectedError as exc:
+			references_text = self._format_protected_references(exc)
+			if instance.ativo:
+				instance.ativo = False
+				instance.save(update_fields=['ativo', 'updated_at'])
+				return Response(
+					{
+						'action': 'inactivated',
+						'detail': (
+							'Este material não pode ser excluído porque já possui '
+							f'{references_text} vinculados. Para preservar o histórico, ele foi inativado.'
+						),
+					},
+					status=status.HTTP_200_OK,
+				)
+			return Response(
+				{
+					'action': 'blocked',
+					'detail': (
+						'Este material não pode ser excluído porque já possui '
+						f'{references_text} vinculados e já está inativo.'
+					),
+				},
+				status=status.HTTP_200_OK,
+			)
+
+		return Response({'action': 'deleted', 'detail': 'Material excluído permanentemente.'}, status=status.HTTP_200_OK)
 
 
 class EstoqueViewSet(viewsets.ReadOnlyModelViewSet):
@@ -292,6 +342,8 @@ class RelatorioPorMarcaView(APIView):
 		# Reaproveita os filtros de venda para recortar o período/cliente/tipo.
 		filtro = VendaFilter(request.GET, queryset=Venda.objects.filter(cancelada=False))
 		vendas_ids = filtro.qs.values_list('id', flat=True)
+		quantity_field = DecimalField(max_digits=20, decimal_places=6)
+		quantity_zero = Value(0, output_field=quantity_field)
 		money_field = DecimalField(max_digits=20, decimal_places=2)
 		money_zero = Value(0, output_field=money_field)
 
@@ -300,7 +352,7 @@ class RelatorioPorMarcaView(APIView):
 			.values('produto__marca')
 			.annotate(
 				quantidade_itens=Count('id'),
-				quantidade_total=Coalesce(Sum('quantidade'), 0),
+				quantidade_total=Coalesce(Sum('quantidade'), quantity_zero, output_field=quantity_field),
 				total_vendido=Coalesce(Sum('subtotal_venda'), money_zero, output_field=money_field),
 				total_lucro=Coalesce(Sum('subtotal_lucro'), money_zero, output_field=money_field),
 			)

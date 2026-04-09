@@ -1,5 +1,18 @@
 <template>
   <div class="max-w-7xl mx-auto">
+    <div
+      v-if="downloadingPdfId !== null"
+      class="fixed right-4 top-4 z-[80] flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card px-4 py-3 shadow-lg"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="h-4 w-4 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+      <div>
+        <div class="text-sm font-semibold text-foreground">Gerando PDF do orçamento</div>
+        <div class="text-xs text-muted-foreground">Aguarde, isso pode levar alguns segundos...</div>
+      </div>
+    </div>
+
     <PageHeader title="Orçamentos" description="Monte propostas comerciais e gere PDF para o cliente">
       <template #actions>
         <AppButton icon="mdi-plus" @click="openDialog">Novo orçamento</AppButton>
@@ -43,9 +56,15 @@
                   type="button"
                   class="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Baixar PDF"
+                  :title="downloadingPdfId === item.id ? 'Gerando PDF...' : 'Baixar PDF'"
+                  :disabled="downloadingPdfId === item.id"
                   @click="downloadPdf(item.id)"
                 >
-                  <span class="mdi mdi-file-pdf-box text-lg" />
+                  <span
+                    v-if="downloadingPdfId === item.id"
+                    class="inline-block h-[18px] w-[18px] animate-spin rounded-full border-2 border-current/25 border-t-current"
+                  />
+                  <span v-else class="mdi mdi-file-pdf-box text-lg" />
                 </button>
                 <button
                   type="button"
@@ -149,6 +168,8 @@
           Total final: <strong>{{ formatBRL(totalOrcamento) }}</strong>
         </AppAlert>
 
+        <AppAlert v-if="pdfError" variant="error">{{ pdfError }}</AppAlert>
+
         <div class="flex justify-end gap-3 border-t border-border pt-4">
           <AppButton variant="outline" @click="closeDialog">Cancelar</AppButton>
           <AppButton type="submit" icon="mdi-file-check-outline" :loading="saving">Gerar orçamento</AppButton>
@@ -177,6 +198,8 @@ const produtos = ref<any[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogOpen = ref(false)
+const downloadingPdfId = ref<number | null>(null)
+const pdfError = ref('')
 
 const form = ref<any>({})
 
@@ -331,13 +354,23 @@ async function save() {
 }
 
 async function downloadPdf(id: number) {
-  const response = await api.get(`/orcamentos/${id}/pdf/`, { responseType: 'blob' })
-  const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `orcamento-${id}.pdf`
-  link.click()
-  window.URL.revokeObjectURL(url)
+  downloadingPdfId.value = id
+  pdfError.value = ''
+  try {
+    const response = await api.get(`/orcamentos/${id}/pdf/`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `orcamento-${id}.pdf`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (error: any) {
+    pdfError.value =
+      error?.response?.data?.detail ||
+      'Não foi possível gerar o PDF agora. Verifique se o backend está com o ReportLab instalado.'
+  } finally {
+    downloadingPdfId.value = null
+  }
 }
 
 async function remove(item: any) {

@@ -144,6 +144,56 @@ class ProdutoApiTests(BaseAuthenticatedAPITestCase):
 		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 		self.assertIn('marca', response.data)
 
+	def test_exclui_material_sem_historico(self):
+		produto = Produto.objects.create(
+			tipo_material=TipoMaterial.OUTRO,
+			nome_produto='Argamassa AC1',
+			descricao_produto='Sem histórico',
+			unidade_estoque=UnidadeMedida.PACOTE,
+			unidade_medida=UnidadeMedida.PACOTE,
+			quantidade_por_unidade='1.000',
+			custo_unitario_fabrica='12.000000',
+			preco_unitario_loja='19.90',
+			ativo=True,
+		)
+
+		response = self.client.delete(f'/api/produtos/{produto.id}/')
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data['action'], 'deleted')
+		self.assertFalse(Produto.objects.filter(id=produto.id).exists())
+
+	def test_inativa_material_com_historico_ao_excluir(self):
+		produto = self.create_areia()
+		orcamento = Orcamento.objects.create(
+			cliente_nome='Cliente teste',
+			validade_dias=7,
+			valor_total_bruto='150.00',
+			desconto_percentual='0.00',
+			desconto_valor='0.00',
+			valor_total='150.00',
+			usuario_responsavel=self.user,
+		)
+		ItemOrcamento.objects.create(
+			orcamento=orcamento,
+			produto=produto,
+			quantidade='1.000000',
+			unidade_venda=UnidadeMedida.METRO,
+			quantidade_estoque_referencia='1.000000',
+			fator_conversao_estoque='1.000000',
+			quantidade_por_unidade='1.000',
+			preco_unitario='150.00',
+			subtotal='150.00',
+		)
+
+		response = self.client.delete(f'/api/produtos/{produto.id}/')
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data['action'], 'inactivated')
+		produto.refresh_from_db()
+		self.assertFalse(produto.ativo)
+		self.assertTrue(Produto.objects.filter(id=produto.id).exists())
+
 
 class AreiaVendaApiTests(BaseAuthenticatedAPITestCase):
 	def setUp(self):
