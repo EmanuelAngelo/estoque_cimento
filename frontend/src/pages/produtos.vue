@@ -275,6 +275,7 @@ const tipoMaterialOptions = [
 
 const marcasCimento = [
   { title: 'Itaqui', value: 'ITAQUI' },
+  { title: 'Apodi', value: 'APODI' },
   { title: 'Bravo', value: 'BRAVO' },
   { title: 'Poty', value: 'POTY' },
   { title: 'Monte Carlos', value: 'MONTE_CARLOS' },

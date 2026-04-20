@@ -27,7 +27,7 @@ from .models import (
 
 MONEY_PRECISION = Decimal('0.01')
 QUANTITY_PRECISION = Decimal('0.000001')
-STORE_NAME = 'Material de Construção Batatã'
+STORE_NAME = 'Material de Construção'
 STORE_PHONE = 'Telefone WhatsApp: 98 988495700'
 STORE_ADDRESS_LINES = [
     'Endereço: Avenida Engenheiro Emiliano Macieira 22',
@@ -750,7 +750,12 @@ def gerar_pdf_orcamento(orcamento: Orcamento) -> BytesIO:
         return Paragraph(str(text), style)
 
     def money_text(value: Decimal) -> str:
-        return f'R$ {_quantize_money(value):.2f}'
+        # Format as Brazilian style: thousands separator '.' and decimal ','
+        v = _quantize_money(value)
+        s = f"{v:,.2f}"  # produces '1,250.00' in en_US style
+        # swap separators: ',' -> temporary, '.' -> ',', temporary -> '.' => '1.250,00'
+        s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
+        return f'R$ {s}'
 
     def quantity_text(value: Decimal) -> str:
         return f'{_to_decimal(value):f}'.rstrip('0').rstrip('.') or '0'
@@ -771,7 +776,7 @@ def gerar_pdf_orcamento(orcamento: Orcamento) -> BytesIO:
                 [
                     paragraph(STORE_NAME, store_name_style),
                     paragraph('Orçamento de Materiais', title_style),
-                    paragraph('Proposta comercial organizada para apresentação ao cliente.', subtitle_style),
+                    # paragraph('Proposta comercial organizada para apresentação ao cliente.', subtitle_style),
                     Spacer(1, 1.5 * mm),
                     paragraph(store_info_text, store_info_style),
                 ],

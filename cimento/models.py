@@ -4,6 +4,7 @@ from django.db import models
 
 class MarcaCimento(models.TextChoices):
 	ITAQUI = 'ITAQUI', 'Itaqui'
+	APODI = 'APODI', 'Apodi'
 	BRAVO = 'BRAVO', 'Bravo'
 	POTY = 'POTY', 'Poty'
 	MONTE_CARLOS = 'MONTE_CARLOS', 'Monte Carlos'

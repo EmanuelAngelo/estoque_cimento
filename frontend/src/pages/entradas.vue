@@ -194,7 +194,12 @@ const confirmDeleteDescription = computed(() => {
 })
 
 const lastAutoCost = ref<number | null>(null)
-const produtoSelecionado = computed(() => produtos.value.find((p) => p.id === form.value.produto_id) ?? null)
+const produtoSelecionado = computed(() => {
+  const currentId = form.value?.produto_id
+  if (currentId == null) return null
+  const idNum = Number(currentId)
+  return produtos.value.find((p) => Number(p.id) === idNum) ?? null
+})
 const unidadesEntradaDisponiveis = computed(() => {
   const produto = produtoSelecionado.value
   if (!produto) return []
