@@ -531,27 +531,49 @@ def criar_orcamento(
 
     total_bruto = Decimal('0.00')
     for item in itens:
-        produto = item['produto']
-        unidade_venda = item.get('unidade_venda') or produto.unidade_estoque
-        calculo = calcular_item_comercial(
-            produto=produto,
-            quantidade=item['quantidade'],
-            unidade_venda=unidade_venda,
-            custo_base_unitario=_resolve_custo_unitario_base(produto),
-            preco_unitario=item.get('preco_unitario'),
-        )
-        ItemOrcamento.objects.create(
-            orcamento=orcamento,
-            produto=produto,
-            quantidade=calculo.quantidade_venda,
-            unidade_venda=calculo.unidade_venda,
-            quantidade_estoque_referencia=calculo.quantidade_estoque,
-            fator_conversao_estoque=calculo.fator_conversao_estoque,
-            quantidade_por_unidade=produto.quantidade_por_unidade,
-            preco_unitario=calculo.preco_unitario,
-            subtotal=calculo.subtotal_venda,
-        )
-        total_bruto += calculo.subtotal_venda
+        produto = item.get('produto')
+        if produto is not None:
+            unidade_venda = item.get('unidade_venda') or produto.unidade_estoque
+            calculo = calcular_item_comercial(
+                produto=produto,
+                quantidade=item['quantidade'],
+                unidade_venda=unidade_venda,
+                custo_base_unitario=_resolve_custo_unitario_base(produto),
+                preco_unitario=item.get('preco_unitario'),
+            )
+            ItemOrcamento.objects.create(
+                orcamento=orcamento,
+                produto=produto,
+                nome_produto='',
+                quantidade=calculo.quantidade_venda,
+                unidade_venda=calculo.unidade_venda,
+                quantidade_estoque_referencia=calculo.quantidade_estoque,
+                fator_conversao_estoque=calculo.fator_conversao_estoque,
+                quantidade_por_unidade=produto.quantidade_por_unidade,
+                preco_unitario=calculo.preco_unitario,
+                subtotal=calculo.subtotal_venda,
+            )
+            total_bruto += calculo.subtotal_venda
+        else:
+            # custom item: product not registered. Use provided nome_produto, unidade_venda and preco_unitario
+            nome = item.get('nome_produto', '')
+            quantidade_venda = _require_positive_quantity(item['quantidade'])
+            unidade_venda = item.get('unidade_venda') or UnidadeMedida.UNIDADE
+            preco_unitario = _quantize_money(item.get('preco_unitario') or Decimal('0'))
+            subtotal = _quantize_money(preco_unitario * quantidade_venda)
+            ItemOrcamento.objects.create(
+                orcamento=orcamento,
+                produto=None,
+                nome_produto=nome,
+                quantidade=quantidade_venda,
+                unidade_venda=unidade_venda,
+                quantidade_estoque_referencia=quantidade_venda,
+                fator_conversao_estoque=Decimal('1'),
+                quantidade_por_unidade=Decimal('1'),
+                preco_unitario=preco_unitario,
+                subtotal=subtotal,
+            )
+            total_bruto += subtotal
 
     desconto_percentual_final = _to_decimal(desconto_percentual)
     desconto_valor = _quantize_money(total_bruto * desconto_percentual_final / Decimal('100'))
@@ -818,9 +840,13 @@ def gerar_pdf_orcamento(orcamento: Orcamento) -> BytesIO:
     ]
 
     for item in orcamento.itens.select_related('produto').all():
-        produto_nome = item.produto.nome_produto
-        if item.produto.marca:
-            produto_nome = f'{item.produto.get_marca_display()} - {produto_nome}'
+        # Support items that reference a registered Produto or custom items (produto is None)
+        if item.produto is not None:
+            produto_nome = item.produto.nome_produto
+            if item.produto.marca:
+                produto_nome = f'{item.produto.get_marca_display()} - {produto_nome}'
+        else:
+            produto_nome = item.nome_produto or ''
 
         itens_data.append(
             [

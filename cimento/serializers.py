@@ -359,12 +359,16 @@ class VendaUpdateSerializer(serializers.Serializer):
 
 class ItemOrcamentoSerializer(serializers.ModelSerializer):
     produto = ProdutoSerializer(read_only=True)
+    nome_produto = serializers.CharField(read_only=True)
+    produto_label = serializers.SerializerMethodField()
 
     class Meta:
         model = ItemOrcamento
         fields = [
             'id',
             'produto',
+            'produto_label',
+            'nome_produto',
             'quantidade',
             'unidade_venda',
             'quantidade_estoque_referencia',
@@ -373,6 +377,11 @@ class ItemOrcamentoSerializer(serializers.ModelSerializer):
             'preco_unitario',
             'subtotal',
         ]
+
+    def get_produto_label(self, obj: ItemOrcamento):
+        if obj.produto is not None:
+            return str(obj.produto)
+        return obj.nome_produto or ''
 
 
 class OrcamentoSerializer(serializers.ModelSerializer):
@@ -397,7 +406,9 @@ class OrcamentoSerializer(serializers.ModelSerializer):
 
 
 class OrcamentoItemCreateSerializer(serializers.Serializer):
-    produto_id = serializers.IntegerField()
+    # Either provide produto_id for a registered product OR nome_produto for a custom item
+    produto_id = serializers.IntegerField(required=False)
+    nome_produto = serializers.CharField(required=False, allow_blank=True, default='')
     quantidade = serializers.DecimalField(max_digits=14, decimal_places=6, min_value=Decimal('0.000001'))
     unidade_venda = serializers.ChoiceField(choices=UnidadeMedida.choices, required=False)
     preco_unitario = serializers.DecimalField(
@@ -412,6 +423,14 @@ class OrcamentoItemCreateSerializer(serializers.Serializer):
         if not Produto.objects.filter(id=value, ativo=True).exists():
             raise serializers.ValidationError('Produto inválido ou inativo.')
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        produto_id = attrs.get('produto_id')
+        nome = attrs.get('nome_produto', '').strip()
+        if not produto_id and not nome:
+            raise serializers.ValidationError('Informe um produto cadastrado ou um nome de produto personalizado.')
+        return attrs
 
 
 class OrcamentoCreateSerializer(serializers.Serializer):
@@ -443,15 +462,27 @@ class OrcamentoCreateSerializer(serializers.Serializer):
         request = self.context['request']
         itens = []
         for item in validated_data['itens']:
-            produto = Produto.objects.get(id=item['produto_id'])
-            itens.append(
-                {
-                    'produto': produto,
-                    'quantidade': item['quantidade'],
-                    'unidade_venda': item.get('unidade_venda'),
-                    'preco_unitario': item.get('preco_unitario'),
-                }
-            )
+            if item.get('produto_id'):
+                produto = Produto.objects.get(id=item['produto_id'])
+                itens.append(
+                    {
+                        'produto': produto,
+                        'quantidade': item['quantidade'],
+                        'unidade_venda': item.get('unidade_venda'),
+                        'preco_unitario': item.get('preco_unitario'),
+                    }
+                )
+            else:
+                # custom item (not a registered Produto)
+                itens.append(
+                    {
+                        'produto': None,
+                        'nome_produto': item.get('nome_produto', '').strip(),
+                        'quantidade': item['quantidade'],
+                        'unidade_venda': item.get('unidade_venda'),
+                        'preco_unitario': item.get('preco_unitario') or Decimal('0'),
+                    }
+                )
 
         return criar_orcamento(
             cliente_nome=validated_data['cliente_nome'],

@@ -240,7 +240,9 @@ class Orcamento(models.Model):
 
 class ItemOrcamento(models.Model):
 	orcamento = models.ForeignKey(Orcamento, on_delete=models.CASCADE, related_name='itens')
-	produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name='itens_orcamento')
+	produto = models.ForeignKey(Produto, on_delete=models.SET_NULL, null=True, blank=True, related_name='itens_orcamento')
+	# nome_produto allows storing a free-text product name when the item is not a registered Produto
+	nome_produto = models.CharField(max_length=120, blank=True, default='')
 	quantidade = models.DecimalField(max_digits=14, decimal_places=6)
 	unidade_venda = models.CharField(max_length=20, choices=UnidadeMedida.choices, default=UnidadeMedida.UNIDADE)
 	quantidade_estoque_referencia = models.DecimalField(max_digits=14, decimal_places=6, default=0)

@@ -125,15 +125,26 @@
           <div v-for="(row, index) in form.itens" :key="index" class="rounded-(--radius) border border-border p-4">
             <div class="grid gap-4 md:grid-cols-12">
               <div class="md:col-span-4">
-                <AppSelect
-                  :model-value="row.produto_id"
-                  :items="produtos"
-                  item-title="label"
-                  item-value="id"
-                  label="Material"
-                  placeholder="Selecione"
-                  @update:modelValue="updateRowProduct(Number(index), $event)"
-                />
+                <div class="flex items-center gap-2 mb-2">
+                  <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" v-model="row.use_custom" class="form-checkbox" />
+                    <span class="text-sm">Personalizado</span>
+                  </label>
+                </div>
+                <div v-if="!row.use_custom">
+                  <AppSelect
+                    :model-value="row.produto_id"
+                    :items="produtos"
+                    item-title="label"
+                    item-value="id"
+                    label="Material"
+                    placeholder="Selecione"
+                    @update:modelValue="updateRowProduct(Number(index), $event)"
+                  />
+                </div>
+                <div v-else>
+                  <AppInput v-model="row.nome_produto" label="Nome do material" placeholder="Ex: Areia média" />
+                </div>
               </div>
               <div class="md:col-span-2">
                 <AppInput v-model="row.quantidade" :label="rowQuantityLabel(row)" type="number" min="0.001" step="0.001" />
@@ -141,7 +152,7 @@
               <div class="md:col-span-2">
                 <AppSelect
                   :model-value="row.unidade_venda"
-                  :items="rowUnits(row)"
+                  :items="row.use_custom ? ALL_UNITS : rowUnits(row)"
                   label="Unidade"
                   @update:modelValue="updateRowUnit(Number(index), $event)"
                 />
@@ -246,6 +257,8 @@ function createRow() {
   const unidadeVenda = primeiroProduto?.unidade_estoque ?? null
   return {
     produto_id: primeiroProduto?.id ?? null,
+    use_custom: false,
+    nome_produto: '',
     unidade_venda: unidadeVenda,
     quantidade: 1,
     preco_unitario: resolvePrice(primeiroProduto, unidadeVenda),
@@ -267,7 +280,9 @@ function getProduto(produtoId: unknown) {
 }
 
 function rowMeasure(row: any) {
-  return formatMaterialMeasure(getProduto(row.produto_id)) || '-'
+  const produto = getProduto(row.produto_id)
+  if (produto) return formatMaterialMeasure(produto) || '-'
+  return row.unidade_venda ? getUnitLabel(row.unidade_venda) : '-'
 }
 
 function rowUnits(row: any) {
@@ -277,6 +292,18 @@ function rowUnits(row: any) {
   units.add(String(produto.unidade_estoque))
   return Array.from(units).map((unit) => ({ title: getUnitLabel(unit), value: unit }))
 }
+
+const ALL_UNITS = [
+  'KG',
+  'UNIDADE',
+  'LATA',
+  'MILHEIRO',
+  'CARRADA',
+  'METRO',
+  'METRO_QUADRADO',
+  'METRO_CUBICO',
+  'PACOTE',
+].map((u) => ({ title: getUnitLabel(u), value: u }))
 
 function rowQuantityLabel(row: any) {
   return row.unidade_venda ? `Qtd (${getUnitLabel(row.unidade_venda)})` : 'Qtd'
@@ -290,6 +317,8 @@ function updateRowProduct(index: number, value: string | number | null) {
   const produtoId = value == null ? null : Number(value)
   const row = form.value.itens[index]
   row.produto_id = produtoId
+  // selecting a registered product implies not using a custom free-text item
+  if (produtoId !== null) row.use_custom = false
   const produto = getProduto(produtoId)
   row.unidade_venda = produto?.unidade_estoque ?? null
   row.preco_unitario = resolvePrice(produto, row.unidade_venda)
@@ -298,7 +327,10 @@ function updateRowProduct(index: number, value: string | number | null) {
 function updateRowUnit(index: number, value: string | number | null) {
   const row = form.value.itens[index]
   row.unidade_venda = value == null ? null : String(value)
-  row.preco_unitario = resolvePrice(getProduto(row.produto_id), row.unidade_venda)
+  const produto = getProduto(row.produto_id)
+  if (produto) {
+    row.preco_unitario = resolvePrice(produto, row.unidade_venda)
+  }
 }
 
 function addRow() {
@@ -356,7 +388,8 @@ async function save() {
     desconto_percentual: String(form.value.desconto_percentual ?? 0),
     observacao: String(form.value.observacao ?? ''),
     itens: form.value.itens.map((row: any) => ({
-      produto_id: Number(row.produto_id),
+      produto_id: row.use_custom ? undefined : Number(row.produto_id),
+      nome_produto: row.use_custom ? String(row.nome_produto ?? '').trim() : undefined,
       quantidade: Number(row.quantidade ?? 0),
       unidade_venda: row.unidade_venda,
       preco_unitario: String(row.preco_unitario ?? 0),
