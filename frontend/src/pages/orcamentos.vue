@@ -110,11 +110,14 @@
           <div class="md:col-span-5">
             <AppInput v-model="form.cliente_nome" label="Cliente" placeholder="Nome do cliente" />
           </div>
-          <div class="md:col-span-3">
+          <div class="md:col-span-2">
             <AppInput v-model="form.validade_dias" label="Validade (dias)" type="number" min="1" step="1" />
           </div>
-          <div class="md:col-span-4">
-            <AppInput v-model="form.desconto_percentual" label="Desconto (%)" type="number" min="0" max="100" step="0.01" />
+          <div class="md:col-span-2">
+            <AppInput v-model="descontoValorInput" label="Desconto (R$)" type="number" min="0" step="0.01" />
+          </div>
+          <div class="md:col-span-3">
+            <AppInput v-model="descontoPercentual" label="Desconto (%)" type="number" min="0" max="100" step="0.01" :disabled="true" />
           </div>
           <div class="md:col-span-12">
             <AppTextarea v-model="form.observacao" label="Observação (opcional)" :rows="2" />
@@ -259,7 +262,37 @@ const totalBruto = computed(() =>
   (form.value.itens ?? []).reduce((total: number, row: any) => total + rowSubtotal(row), 0),
 )
 
-const descontoValor = computed(() => totalBruto.value * (Number(form.value.desconto_percentual ?? 0) / 100))
+const descontoValor = computed(() => Number(form.value.desconto_valor ?? 0))
+
+const descontoPercentual = computed({
+  get() {
+    const val = Number(form.value.desconto_valor ?? 0)
+    if (!totalBruto.value) return 0
+    return Number(((val / totalBruto.value) * 100).toFixed(2))
+  },
+  set(v: number) {
+    const p = Number(v) || 0
+    const pFixed = Number(p.toFixed(2))
+    form.value.desconto_percentual = pFixed
+    const valor = Number((totalBruto.value * pFixed) / 100)
+    form.value.desconto_valor = Number(valor.toFixed(2))
+  },
+})
+
+const descontoValorInput = computed({
+  get() {
+    return Number(form.value.desconto_valor ?? 0)
+  },
+  set(v: number) {
+    let val = Number(v) || 0
+    if (val < 0) val = 0
+    if (val > totalBruto.value) val = totalBruto.value
+    const valFixed = Number(val.toFixed(2))
+    form.value.desconto_valor = valFixed
+    const perc = totalBruto.value ? (valFixed / totalBruto.value) * 100 : 0
+    form.value.desconto_percentual = Number(perc.toFixed(2))
+  },
+})
 
 const totalOrcamento = computed(() => totalBruto.value - descontoValor.value)
 
@@ -291,6 +324,7 @@ function reset() {
     cliente_nome: '',
     validade_dias: 7,
     desconto_percentual: 0,
+    desconto_valor: 0,
     observacao: '',
     itens: [createRow()],
   }
@@ -391,6 +425,7 @@ function openEdit(item: any) {
     cliente_nome: item.cliente_nome ?? '',
     validade_dias: item.validade_dias ?? 7,
     desconto_percentual: Number(item.desconto_percentual ?? 0),
+    desconto_valor: Number(item.desconto_valor ?? 0),
     observacao: item.observacao ?? '',
     itens: (item.itens ?? []).map((it: any) => ({
       produto_id: it.produto?.id ?? null,
@@ -437,7 +472,7 @@ async function save() {
   const payload = {
     cliente_nome: String(form.value.cliente_nome ?? '').trim(),
     validade_dias: Number(form.value.validade_dias ?? 7),
-    desconto_percentual: String(form.value.desconto_percentual ?? 0),
+    desconto_percentual: String(descontoPercentual.value ?? 0),
     observacao: String(form.value.observacao ?? ''),
     itens: form.value.itens.map((row: any) => ({
       produto_id: row.use_custom ? undefined : Number(row.produto_id),
@@ -471,7 +506,7 @@ async function performSave(mode: 'orcamento' | 'venda') {
   const payload = {
     cliente_nome: String(form.value.cliente_nome ?? '').trim(),
     validade_dias: Number(form.value.validade_dias ?? 7),
-    desconto_percentual: String(form.value.desconto_percentual ?? 0),
+    desconto_percentual: String(descontoPercentual.value ?? 0),
     observacao: String(form.value.observacao ?? ''),
     itens: form.value.itens.map((row: any) => ({
       produto_id: row.use_custom ? undefined : Number(row.produto_id),
