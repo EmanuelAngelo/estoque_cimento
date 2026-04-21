@@ -2,7 +2,7 @@
   <div class="max-w-7xl mx-auto">
     <div
       v-if="downloadingPdfId !== null"
-      class="fixed right-4 top-4 z-[80] flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card px-4 py-3 shadow-lg"
+      class="fixed right-4 top-4 z-80 flex items-center gap-3 rounded-(--radius) border border-border bg-card px-4 py-3 shadow-lg"
       role="status"
       aria-live="polite"
     >
@@ -62,7 +62,7 @@
                 >
                   <span
                     v-if="downloadingPdfId === item.id"
-                    class="inline-block h-[18px] w-[18px] animate-spin rounded-full border-2 border-current/25 border-t-current"
+                    class="inline-block h-4.5 w-4.5 animate-spin rounded-full border-2 border-current/25 border-t-current"
                   />
                   <span v-else class="mdi mdi-file-pdf-box text-lg" />
                 </button>
