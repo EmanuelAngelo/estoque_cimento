@@ -29,6 +29,13 @@ from .services import (
     registrar_entrada,
     registrar_venda_simples,
 )
+from .services import (
+    calcular_item_comercial,
+    _resolve_custo_unitario_base,
+    _quantize_money,
+    _require_positive_quantity,
+    _to_decimal,
+)
 
 
 class UserMeSerializer(serializers.Serializer):
@@ -492,6 +499,98 @@ class OrcamentoCreateSerializer(serializers.Serializer):
             observacao=validated_data.get('observacao', ''),
             usuario=request.user,
         )
+
+
+class OrcamentoUpdateSerializer(serializers.Serializer):
+    cliente_nome = serializers.CharField()
+    validade_dias = serializers.IntegerField(required=False, min_value=1, max_value=60)
+    desconto_percentual = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        required=False,
+        min_value=Decimal('0'),
+        max_value=Decimal('100'),
+        default=Decimal('0'),
+    )
+    observacao = serializers.CharField(required=False, allow_blank=True, default='')
+    itens = OrcamentoItemCreateSerializer(many=True)
+
+    def validate_cliente_nome(self, value: str):
+        value = (value or '').strip()
+        if not value:
+            raise serializers.ValidationError('Nome do cliente é obrigatório.')
+        return value
+
+    def validate_itens(self, value):
+        if not value:
+            raise serializers.ValidationError('Informe ao menos um item para o orçamento.')
+        return value
+
+    def update(self, instance: Orcamento, validated_data):
+        request = self.context['request']
+        # update basic fields
+        instance.cliente_nome = (validated_data['cliente_nome'] or '').strip()
+        instance.validade_dias = validated_data.get('validade_dias', instance.validade_dias)
+        instance.desconto_percentual = _quantize_money(validated_data.get('desconto_percentual', instance.desconto_percentual))
+        instance.observacao = validated_data.get('observacao', instance.observacao) or ''
+        instance.save(update_fields=['cliente_nome', 'validade_dias', 'desconto_percentual', 'observacao'])
+
+        # replace items
+        ItemOrcamento.objects.filter(orcamento=instance).delete()
+        total_bruto = Decimal('0.00')
+        for item in validated_data['itens']:
+            if item.get('produto_id'):
+                produto = Produto.objects.get(id=item['produto_id'])
+                unidade_venda = item.get('unidade_venda') or produto.unidade_estoque
+                calculo = calcular_item_comercial(
+                    produto=produto,
+                    quantidade=item['quantidade'],
+                    unidade_venda=unidade_venda,
+                    custo_base_unitario=_resolve_custo_unitario_base(produto),
+                    preco_unitario=item.get('preco_unitario'),
+                )
+                ItemOrcamento.objects.create(
+                    orcamento=instance,
+                    produto=produto,
+                    nome_produto='',
+                    quantidade=calculo.quantidade_venda,
+                    unidade_venda=calculo.unidade_venda,
+                    quantidade_estoque_referencia=calculo.quantidade_estoque,
+                    fator_conversao_estoque=calculo.fator_conversao_estoque,
+                    quantidade_por_unidade=produto.quantidade_por_unidade,
+                    preco_unitario=calculo.preco_unitario,
+                    subtotal=calculo.subtotal_venda,
+                )
+                total_bruto += calculo.subtotal_venda
+            else:
+                nome = item.get('nome_produto', '')
+                quantidade_venda = _require_positive_quantity(item['quantidade'])
+                unidade_venda = item.get('unidade_venda') or UnidadeMedida.UNIDADE
+                preco_unitario = _quantize_money(item.get('preco_unitario') or Decimal('0'))
+                subtotal = _quantize_money(preco_unitario * quantidade_venda)
+                ItemOrcamento.objects.create(
+                    orcamento=instance,
+                    produto=None,
+                    nome_produto=nome,
+                    quantidade=quantidade_venda,
+                    unidade_venda=unidade_venda,
+                    quantidade_estoque_referencia=quantidade_venda,
+                    fator_conversao_estoque=Decimal('1'),
+                    quantidade_por_unidade=Decimal('1'),
+                    preco_unitario=preco_unitario,
+                    subtotal=subtotal,
+                )
+                total_bruto += subtotal
+
+        desconto_percentual_final = _to_decimal(validated_data.get('desconto_percentual', instance.desconto_percentual))
+        desconto_valor = _quantize_money(total_bruto * desconto_percentual_final / Decimal('100'))
+        total_liquido = _quantize_money(total_bruto - desconto_valor)
+        instance.valor_total_bruto = _quantize_money(total_bruto)
+        instance.desconto_percentual = desconto_percentual_final.quantize(Decimal('0.01'))
+        instance.desconto_valor = desconto_valor
+        instance.valor_total = total_liquido
+        instance.save(update_fields=['valor_total_bruto', 'desconto_percentual', 'desconto_valor', 'valor_total'])
+        return instance
 
 
 class MovimentacaoEstoqueSerializer(serializers.ModelSerializer):

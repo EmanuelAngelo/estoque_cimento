@@ -268,12 +268,15 @@ class OrcamentoViewSet(viewsets.ModelViewSet):
 		.prefetch_related('itens', 'itens__produto', 'itens__produto__conversoes_unidade', 'itens__produto__precos_venda')
 		.all()
 	)
-	http_method_names = ['get', 'post', 'delete', 'head', 'options']
+	http_method_names = ['get', 'post', 'patch', 'put', 'delete', 'head', 'options']
 	ordering_fields = ['data_orcamento', 'valor_total', 'id']
 
 	def get_serializer_class(self):
 		if self.action == 'create':
 			return OrcamentoCreateSerializer
+		if self.action in {'update', 'partial_update'}:
+			from .serializers import OrcamentoUpdateSerializer
+			return OrcamentoUpdateSerializer
 		return OrcamentoSerializer
 
 	def create(self, request, *args, **kwargs):
@@ -282,6 +285,13 @@ class OrcamentoViewSet(viewsets.ModelViewSet):
 		orcamento = serializer.save()
 		response_serializer = OrcamentoSerializer(orcamento)
 		return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+	def partial_update(self, request, pk=None):
+		instance = self.get_object()
+		serializer = self.get_serializer(instance, data=request.data, partial=True)
+		serializer.is_valid(raise_exception=True)
+		orcamento = serializer.update(instance, serializer.validated_data)
+		return Response(OrcamentoSerializer(orcamento).data)
 
 
 class OrcamentoPdfView(APIView):
@@ -295,8 +305,11 @@ class OrcamentoPdfView(APIView):
 			),
 			pk=pk,
 		)
-		pdf_buffer = gerar_pdf_orcamento(orcamento)
-		return FileResponse(pdf_buffer, as_attachment=True, filename=f'orcamento-{orcamento.id}.pdf')
+		# Support ?type=venda to render a sale-styled PDF instead of an orçamento
+		doc_type = request.GET.get('type', 'orcamento')
+		pdf_buffer = gerar_pdf_orcamento(orcamento, doc_type=doc_type)
+		filename = f"{doc_type}-{orcamento.id}.pdf" if doc_type != 'orcamento' else f'orcamento-{orcamento.id}.pdf'
+		return FileResponse(pdf_buffer, as_attachment=True, filename=filename)
 
 
 class RelatorioResumoView(APIView):

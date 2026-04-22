@@ -69,6 +69,14 @@
                 <button
                   type="button"
                   class="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Editar"
+                  @click="openEdit(item)"
+                >
+                  <span class="mdi mdi-pencil text-lg" />
+                </button>
+                <button
+                  type="button"
+                  class="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Excluir"
                   @click="remove(item)"
                 >
@@ -97,7 +105,7 @@
       description="Monte a proposta com os materiais, preços e validade"
       max-width="xl"
     >
-      <form class="space-y-6" @submit.prevent="save">
+      <form class="space-y-6" @submit.prevent="openActionDialog">
         <div class="grid gap-4 md:grid-cols-12">
           <div class="md:col-span-5">
             <AppInput v-model="form.cliente_nome" label="Cliente" placeholder="Nome do cliente" />
@@ -188,6 +196,17 @@
       </form>
     </AppModal>
 
+    <AppModal v-model="confirmActionOpen" title="O que deseja fazer?" description="Escolha se quer criar o orçamento ou gerar um PDF como venda." max-width="sm">
+      <div class="space-y-4">
+        <div class="text-sm text-muted-foreground">Você pode apenas criar o orçamento para enviar ao cliente, ou gerar um PDF de venda (quando a venda já foi realizada).</div>
+        <div class="flex justify-end gap-3 mt-4">
+          <AppButton variant="outline" @click="confirmActionOpen = false">Cancelar</AppButton>
+          <AppButton @click="performSave('orcamento')">Criar orçamento</AppButton>
+          <AppButton color="success" @click="performSave('venda')">Gerar PDF de venda</AppButton>
+        </div>
+      </div>
+    </AppModal>
+
     <AppConfirmDialog
       v-model="confirmDeleteOpen"
       title="Excluir orçamento"
@@ -221,6 +240,7 @@ const produtos = ref<any[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogOpen = ref(false)
+const confirmActionOpen = ref(false)
 const confirmDeleteOpen = ref(false)
 const deletingId = ref<number | null>(null)
 const itemPendingRemoval = ref<any | null>(null)
@@ -228,6 +248,7 @@ const downloadingPdfId = ref<number | null>(null)
 const pdfError = ref('')
 
 const form = ref<any>({})
+const editingId = ref<number | null>(null)
 const confirmDeleteDescription = computed(() => {
   const item = itemPendingRemoval.value
   if (!item) return 'Deseja excluir este orçamento?'
@@ -344,12 +365,33 @@ function removeRow(index: number) {
 
 function openDialog() {
   reset()
+  editingId.value = null
   dialogOpen.value = true
 }
 
 function closeDialog() {
   dialogOpen.value = false
   reset()
+  editingId.value = null
+}
+
+function openEdit(item: any) {
+  editingId.value = item.id
+  form.value = {
+    cliente_nome: item.cliente_nome ?? '',
+    validade_dias: item.validade_dias ?? 7,
+    desconto_percentual: Number(item.desconto_percentual ?? 0),
+    observacao: item.observacao ?? '',
+    itens: (item.itens ?? []).map((it: any) => ({
+      produto_id: it.produto?.id ?? null,
+      use_custom: !it.produto,
+      nome_produto: it.nome_produto ?? '',
+      unidade_venda: it.unidade_venda,
+      quantidade: Number(it.quantidade ?? 0),
+      preco_unitario: Number(it.preco_unitario ?? 0),
+    })),
+  }
+  dialogOpen.value = true
 }
 
 function sleep(ms: number) {
@@ -398,23 +440,72 @@ async function save() {
 
   saving.value = true
   try {
-    await api.post('/orcamentos/', payload)
+    if (editingId.value) {
+      await api.patch(`/orcamentos/${editingId.value}/`, payload)
+    } else {
+      await api.post('/orcamentos/', payload)
+    }
     await loadOrcamentos(0)
     closeDialog()
+    editingId.value = null
   } finally {
     saving.value = false
   }
 }
 
-async function downloadPdf(id: number) {
+function openActionDialog() {
+  confirmActionOpen.value = true
+}
+
+async function performSave(mode: 'orcamento' | 'venda') {
+  const payload = {
+    cliente_nome: String(form.value.cliente_nome ?? '').trim(),
+    validade_dias: Number(form.value.validade_dias ?? 7),
+    desconto_percentual: String(form.value.desconto_percentual ?? 0),
+    observacao: String(form.value.observacao ?? ''),
+    itens: form.value.itens.map((row: any) => ({
+      produto_id: row.use_custom ? undefined : Number(row.produto_id),
+      nome_produto: row.use_custom ? String(row.nome_produto ?? '').trim() : undefined,
+      quantidade: Number(row.quantidade ?? 0),
+      unidade_venda: row.unidade_venda,
+      preco_unitario: String(row.preco_unitario ?? 0),
+    })),
+  }
+
+  saving.value = true
+  try {
+    let data: any = null
+    if (editingId.value) {
+      const resp = await api.patch(`/orcamentos/${editingId.value}/`, payload)
+      data = resp.data
+    } else {
+      const resp = await api.post('/orcamentos/', payload)
+      data = resp.data
+    }
+    await loadOrcamentos(0)
+    // close and then optionally download the PDF as a venda
+    closeDialog()
+    confirmActionOpen.value = false
+    const docId = data?.id ?? editingId.value
+    if (mode === 'venda' && docId) {
+      await downloadPdf(docId, 'venda')
+    }
+    editingId.value = null
+  } finally {
+    saving.value = false
+  }
+}
+
+async function downloadPdf(id: number, docType: 'orcamento' | 'venda' = 'orcamento') {
   downloadingPdfId.value = id
   pdfError.value = ''
   try {
-    const response = await api.get(`/orcamentos/${id}/pdf/`, { responseType: 'blob' })
+    const urlPath = docType === 'venda' ? `/orcamentos/${id}/pdf/?type=venda` : `/orcamentos/${id}/pdf/`
+    const response = await api.get(urlPath, { responseType: 'blob' })
     const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `orcamento-${id}.pdf`
+    link.download = `${docType}-${id}.pdf`
     link.click()
     window.URL.revokeObjectURL(url)
   } catch (error: any) {

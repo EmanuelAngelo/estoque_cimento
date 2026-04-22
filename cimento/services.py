@@ -586,7 +586,7 @@ def criar_orcamento(
     return orcamento
 
 
-def gerar_pdf_orcamento(orcamento: Orcamento) -> BytesIO:
+def gerar_pdf_orcamento(orcamento: Orcamento, doc_type: str = 'orcamento') -> BytesIO:
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_RIGHT
     from reportlab.lib.pagesizes import A4
@@ -769,14 +769,22 @@ def gerar_pdf_orcamento(orcamento: Orcamento) -> BytesIO:
     if STORE_LOGO_PATH.exists():
         logo_flowable = Image(str(STORE_LOGO_PATH), width=26 * mm, height=26 * mm)
 
+    # Title depends on document type: orcamento vs venda
+    document_title = 'Orçamento de Materiais' if doc_type == 'orcamento' else 'Venda de Materiais'
+
     header_table = Table(
         [
             [
                 logo_flowable,
                 [
                     paragraph(STORE_NAME, store_name_style),
-                    paragraph('Orçamento de Materiais', title_style),
-                    # paragraph('Proposta comercial organizada para apresentação ao cliente.', subtitle_style),
+                    paragraph(document_title, title_style),
+                    paragraph(
+                        'Proposta comercial organizada para apresentação ao cliente.'
+                        if doc_type == 'orcamento'
+                        else 'Comprovante de venda para apresentação ao cliente.',
+                        subtitle_style,
+                    ),
                     Spacer(1, 1.5 * mm),
                     paragraph(store_info_text, store_info_style),
                 ],

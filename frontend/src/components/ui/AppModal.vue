@@ -35,7 +35,7 @@ const props = withDefaults(
     modelValue: boolean
     title: string
     description?: string
-    maxWidth?: 'md' | 'lg' | 'xl' | '2xl' | '4xl'
+    maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl'
   }>(),
   {
     description: '',
@@ -49,6 +49,8 @@ const emit = defineEmits<{
 
 const maxWidthClass = computed(() => {
   switch (props.maxWidth) {
+    case 'sm':
+      return 'max-w-sm'
     case 'md':
       return 'max-w-md'
     case 'lg':
