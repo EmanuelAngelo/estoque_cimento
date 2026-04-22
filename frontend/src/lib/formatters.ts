@@ -38,9 +38,9 @@ const unitLabelMap: Record<string, { singular: string; plural: string }> = {
   LATA: { singular: 'Lata', plural: 'Latas' },
   MILHEIRO: { singular: 'Milheiro', plural: 'Milheiros' },
   CARRADA: { singular: 'Carrada', plural: 'Carradas' },
-  METRO: { singular: 'Metro', plural: 'Metros' },
-  METRO_QUADRADO: { singular: 'Metro quadrado', plural: 'Metros quadrados' },
-  METRO_CUBICO: { singular: 'Metro cúbico', plural: 'Metros cúbicos' },
+  METRO: { singular: 'M', plural: 'M' },
+  METRO_QUADRADO: { singular: 'm²', plural: 'm²' },
+  METRO_CUBICO: { singular: 'm³', plural: 'm³' },
   PACOTE: { singular: 'Pacote', plural: 'Pacotes' },
 }
 

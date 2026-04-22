@@ -275,7 +275,7 @@ function resolvePrice(produto: any, unidadeVenda: string | null) {
 
 function createRow() {
   const primeiroProduto = produtos.value[0] ?? null
-  const unidadeVenda = primeiroProduto?.unidade_estoque ?? null
+  const unidadeVenda = primeiroProduto?.unidade_medida ?? primeiroProduto?.unidade_estoque ?? null
   return {
     produto_id: primeiroProduto?.id ?? null,
     use_custom: false,
@@ -302,15 +302,23 @@ function getProduto(produtoId: unknown) {
 
 function rowMeasure(row: any) {
   const produto = getProduto(row.produto_id)
-  if (produto) return formatMaterialMeasure(produto) || '-'
-  return row.unidade_venda ? getUnitLabel(row.unidade_venda) : '-'
+  // If a registered product is selected, show its commercial unit (unidade_medida) first
+  if (produto) {
+    const unidadeComercial = produto.unidade_medida ?? produto.unidade_estoque
+    return getUnitLabel(unidadeComercial, row.quantidade) || '-'
+  }
+  // For custom items, show the selected unidade_venda if present
+  if (row.unidade_venda) return getUnitLabel(row.unidade_venda, row.quantidade) || '-'
+  return '-'
 }
 
 function rowUnits(row: any) {
   const produto = getProduto(row.produto_id)
   if (!produto) return []
   const units = new Set<string>((produto.precos_venda ?? []).filter((item: any) => item.ativo !== false).map((item: any) => String(item.unidade_venda)))
-  units.add(String(produto.unidade_estoque))
+  // include commercial unit first, then estoque
+  if (produto.unidade_medida) units.add(String(produto.unidade_medida))
+  if (produto.unidade_estoque) units.add(String(produto.unidade_estoque))
   return Array.from(units).map((unit) => ({ title: getUnitLabel(unit), value: unit }))
 }
 
@@ -327,6 +335,8 @@ const ALL_UNITS = [
 ].map((u) => ({ title: getUnitLabel(u), value: u }))
 
 function rowQuantityLabel(row: any) {
+  const produto = getProduto(row.produto_id)
+  if (produto) return `Qtd (${getUnitLabel(produto.unidade_medida ?? produto.unidade_estoque)})`
   return row.unidade_venda ? `Qtd (${getUnitLabel(row.unidade_venda)})` : 'Qtd'
 }
 
