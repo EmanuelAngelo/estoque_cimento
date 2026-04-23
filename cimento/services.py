@@ -836,7 +836,7 @@ def gerar_pdf_orcamento(orcamento: Orcamento, doc_type: str = 'orcamento') -> By
         )
     else:
         # no responsible provided — show only validade in a single-row table with an empty cell
-        info_rows.append([right_cell, ['', '']])
+        info_rows.append([right_cell, [paragraph('', meta_label_style), paragraph('', meta_value_style)]])
 
     info_table = Table(info_rows, colWidths=[89 * mm, 89 * mm])
     info_table.setStyle(
