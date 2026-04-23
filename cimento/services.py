@@ -516,6 +516,7 @@ def criar_orcamento(
     *,
     cliente_nome: str,
     itens: list[dict],
+    nome_responsavel: str = '',
     usuario,
     validade_dias: int = 7,
     desconto_percentual: Decimal = Decimal('0'),
@@ -526,6 +527,7 @@ def criar_orcamento(
         validade_dias=validade_dias,
         desconto_percentual=_quantize_money(desconto_percentual),
         observacao=observacao or '',
+        nome_responsavel=(nome_responsavel or '').strip(),
         usuario_responsavel=usuario,
     )
 
@@ -812,19 +814,31 @@ def gerar_pdf_orcamento(orcamento: Orcamento, doc_type: str = 'orcamento') -> By
     story.append(header_table)
     story.append(Spacer(1, 6 * mm))
 
-    info_table = Table(
+    # Build information table rows dynamically. If `nome_responsavel` is provided (non-empty),
+    # show it. If it's empty, omit the RESPONSÁVEL cell entirely (user requested blank hides it).
+    info_rows = []
+    info_rows.append(
         [
-            [
-                [paragraph('CLIENTE', meta_label_style), paragraph(orcamento.cliente_nome, meta_value_style)],
-                [paragraph('EMISSÃO', meta_label_style), paragraph(issued_at.strftime('%d/%m/%Y %H:%M'), meta_value_style)],
-            ],
-            [
-                [paragraph('VALIDADE', meta_label_style), paragraph(validade.strftime('%d/%m/%Y'), meta_value_style)],
-                [paragraph('RESPONSÁVEL', meta_label_style), paragraph(orcamento.usuario_responsavel.username, meta_value_style)],
-            ],
-        ],
-        colWidths=[89 * mm, 89 * mm],
+            [paragraph('CLIENTE', meta_label_style), paragraph(orcamento.cliente_nome, meta_value_style)],
+            [paragraph('EMISSÃO', meta_label_style), paragraph(issued_at.strftime('%d/%m/%Y %H:%M'), meta_value_style)],
+        ]
     )
+
+    # second row: validade and (optionally) responsável
+    right_cell = [paragraph('VALIDADE', meta_label_style), paragraph(validade.strftime('%d/%m/%Y'), meta_value_style)]
+    if getattr(orcamento, 'nome_responsavel', '').strip():
+        # prefer free-text nome_responsavel when provided
+        info_rows.append(
+            [
+                right_cell,
+                [paragraph('RESPONSÁVEL', meta_label_style), paragraph(orcamento.nome_responsavel, meta_value_style)],
+            ]
+        )
+    else:
+        # no responsible provided — show only validade in a single-row table with an empty cell
+        info_rows.append([right_cell, ['', '']])
+
+    info_table = Table(info_rows, colWidths=[89 * mm, 89 * mm])
     info_table.setStyle(
         TableStyle(
             [

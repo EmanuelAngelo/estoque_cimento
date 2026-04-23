@@ -394,6 +394,7 @@ class ItemOrcamentoSerializer(serializers.ModelSerializer):
 class OrcamentoSerializer(serializers.ModelSerializer):
     itens = ItemOrcamentoSerializer(many=True, read_only=True)
     usuario_responsavel = serializers.CharField(source='usuario_responsavel.username', read_only=True)
+    nome_responsavel = serializers.CharField(read_only=True)
 
     class Meta:
         model = Orcamento
@@ -408,6 +409,7 @@ class OrcamentoSerializer(serializers.ModelSerializer):
             'valor_total',
             'observacao',
             'usuario_responsavel',
+            'nome_responsavel',
             'itens',
         ]
 
@@ -442,6 +444,7 @@ class OrcamentoItemCreateSerializer(serializers.Serializer):
 
 class OrcamentoCreateSerializer(serializers.Serializer):
     cliente_nome = serializers.CharField()
+    nome_responsavel = serializers.CharField(required=False, allow_blank=True, default='')
     validade_dias = serializers.IntegerField(required=False, min_value=1, max_value=60, default=7)
     desconto_percentual = serializers.DecimalField(
         max_digits=5,
@@ -497,12 +500,14 @@ class OrcamentoCreateSerializer(serializers.Serializer):
             validade_dias=validated_data.get('validade_dias', 7),
             desconto_percentual=validated_data.get('desconto_percentual', Decimal('0')),
             observacao=validated_data.get('observacao', ''),
+            nome_responsavel=validated_data.get('nome_responsavel', ''),
             usuario=request.user,
         )
 
 
 class OrcamentoUpdateSerializer(serializers.Serializer):
     cliente_nome = serializers.CharField()
+    nome_responsavel = serializers.CharField(required=False, allow_blank=True, default='')
     validade_dias = serializers.IntegerField(required=False, min_value=1, max_value=60)
     desconto_percentual = serializers.DecimalField(
         max_digits=5,
@@ -530,10 +535,11 @@ class OrcamentoUpdateSerializer(serializers.Serializer):
         request = self.context['request']
         # update basic fields
         instance.cliente_nome = (validated_data['cliente_nome'] or '').strip()
+        instance.nome_responsavel = validated_data.get('nome_responsavel', instance.nome_responsavel) or ''
         instance.validade_dias = validated_data.get('validade_dias', instance.validade_dias)
         instance.desconto_percentual = _quantize_money(validated_data.get('desconto_percentual', instance.desconto_percentual))
         instance.observacao = validated_data.get('observacao', instance.observacao) or ''
-        instance.save(update_fields=['cliente_nome', 'validade_dias', 'desconto_percentual', 'observacao'])
+        instance.save(update_fields=['cliente_nome', 'validade_dias', 'desconto_percentual', 'observacao', 'nome_responsavel'])
 
         # replace items
         ItemOrcamento.objects.filter(orcamento=instance).delete()

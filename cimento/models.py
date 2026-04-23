@@ -226,6 +226,9 @@ class Orcamento(models.Model):
 	desconto_valor = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 	valor_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 	observacao = models.TextField(blank=True, default='')
+	# optional free-text responsible name. When provided, it overrides the linked user
+	# If left blank, the document will omit the responsible line.
+	nome_responsavel = models.CharField(max_length=120, blank=True, default='')
 	usuario_responsavel = models.ForeignKey(
 		settings.AUTH_USER_MODEL,
 		on_delete=models.PROTECT,

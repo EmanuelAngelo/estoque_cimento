@@ -122,6 +122,9 @@
           <div class="md:col-span-12">
             <AppTextarea v-model="form.observacao" label="Observação (opcional)" :rows="2" />
           </div>
+          <div class="md:col-span-12">
+            <AppInput v-model="form.nome_responsavel" label="Responsável (opcional)" placeholder="Nome do responsável — deixe em branco para omitir no PDF" />
+          </div>
         </div>
 
         <div class="space-y-3">
@@ -237,6 +240,7 @@ import AppTextarea from '@/components/ui/AppTextarea.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { formatBRL, formatDateTime, formatMaterialLabel, formatMaterialMeasure, getUnitLabel } from '@/lib/formatters'
+import { useAuthStore } from '@/stores/auth'
 
 const items = ref<any[]>([])
 const produtos = ref<any[]>([])
@@ -251,6 +255,7 @@ const downloadingPdfId = ref<number | null>(null)
 const pdfError = ref('')
 
 const form = ref<any>({})
+const auth = useAuthStore()
 const editingId = ref<number | null>(null)
 const confirmDeleteDescription = computed(() => {
   const item = itemPendingRemoval.value
@@ -323,6 +328,7 @@ function reset() {
   form.value = {
     cliente_nome: '',
     validade_dias: 7,
+    nome_responsavel: auth.user?.username ?? '',
     desconto_percentual: 0,
     desconto_valor: 0,
     observacao: '',
@@ -335,13 +341,23 @@ function getProduto(produtoId: unknown) {
 }
 
 function rowMeasure(row: any) {
+  // Custom rows: always show the selected sale unit
+  if (row.use_custom) {
+    if (row.unidade_venda) return getUnitLabel(row.unidade_venda, row.quantidade) || '-'
+    return '-'
+  }
+
   const produto = getProduto(row.produto_id)
-  // If a registered product is selected, show its commercial unit (unidade_medida) first
+  // Registered product: prefer the user-selected unidade_venda if it's set and different
   if (produto) {
     const unidadeComercial = produto.unidade_medida ?? produto.unidade_estoque
+    if (row.unidade_venda && String(row.unidade_venda) !== String(unidadeComercial)) {
+      return getUnitLabel(row.unidade_venda, row.quantidade) || '-'
+    }
     return getUnitLabel(unidadeComercial, row.quantidade) || '-'
   }
-  // For custom items, show the selected unidade_venda if present
+
+  // Fallback: show selected unidade_venda if present
   if (row.unidade_venda) return getUnitLabel(row.unidade_venda, row.quantidade) || '-'
   return '-'
 }
@@ -369,8 +385,15 @@ const ALL_UNITS = [
 ].map((u) => ({ title: getUnitLabel(u), value: u }))
 
 function rowQuantityLabel(row: any) {
+  if (row.use_custom) return row.unidade_venda ? `Qtd (${getUnitLabel(row.unidade_venda)})` : 'Qtd'
   const produto = getProduto(row.produto_id)
-  if (produto) return `Qtd (${getUnitLabel(produto.unidade_medida ?? produto.unidade_estoque)})`
+  if (produto) {
+    const unidadeComercial = produto.unidade_medida ?? produto.unidade_estoque
+    if (row.unidade_venda && String(row.unidade_venda) !== String(unidadeComercial)) {
+      return `Qtd (${getUnitLabel(row.unidade_venda)})`
+    }
+    return `Qtd (${getUnitLabel(unidadeComercial)})`
+  }
   return row.unidade_venda ? `Qtd (${getUnitLabel(row.unidade_venda)})` : 'Qtd'
 }
 
@@ -385,7 +408,8 @@ function updateRowProduct(index: number, value: string | number | null) {
   // selecting a registered product implies not using a custom free-text item
   if (produtoId !== null) row.use_custom = false
   const produto = getProduto(produtoId)
-  row.unidade_venda = produto?.unidade_estoque ?? null
+  // default the sale unit to the product's commercial unit when available
+  row.unidade_venda = produto?.unidade_medida ?? produto?.unidade_estoque ?? null
   row.preco_unitario = resolvePrice(produto, row.unidade_venda)
 }
 
@@ -423,6 +447,7 @@ function openEdit(item: any) {
   editingId.value = item.id
   form.value = {
     cliente_nome: item.cliente_nome ?? '',
+    nome_responsavel: item.nome_responsavel ?? item.usuario_responsavel ?? auth.user?.username ?? '',
     validade_dias: item.validade_dias ?? 7,
     desconto_percentual: Number(item.desconto_percentual ?? 0),
     desconto_valor: Number(item.desconto_valor ?? 0),
@@ -469,18 +494,36 @@ async function load() {
 }
 
 async function save() {
-  const payload = {
-    cliente_nome: String(form.value.cliente_nome ?? '').trim(),
-    validade_dias: Number(form.value.validade_dias ?? 7),
-    desconto_percentual: String(descontoPercentual.value ?? 0),
-    observacao: String(form.value.observacao ?? ''),
-    itens: form.value.itens.map((row: any) => ({
+  // normalize and validate items before sending
+  const normalizedItems = form.value.itens.map((row: any) => {
+    const produto = row.produto_id ? getProduto(row.produto_id) : null
+    const unidade = row.unidade_venda ?? (produto ? produto.unidade_medida ?? produto.unidade_estoque : undefined)
+    return {
       produto_id: row.use_custom ? undefined : Number(row.produto_id),
       nome_produto: row.use_custom ? String(row.nome_produto ?? '').trim() : undefined,
       quantidade: Number(row.quantidade ?? 0),
-      unidade_venda: row.unidade_venda,
+      unidade_venda: unidade,
       preco_unitario: String(row.preco_unitario ?? 0),
-    })),
+    }
+  })
+
+  // simple client-side validation to provide clearer error messages
+  for (const it of normalizedItems) {
+    if (!it.produto_id && !(it.nome_produto && it.nome_produto.trim())) {
+      throw new Error('Cada item precisa ter um produto cadastrado ou um nome de produto personalizado.')
+    }
+    if (!it.unidade_venda) {
+      throw new Error('Cada item deve ter uma unidade (ex: KG, METRO).')
+    }
+  }
+
+  const payload = {
+    cliente_nome: String(form.value.cliente_nome ?? '').trim(),
+    nome_responsavel: String(form.value.nome_responsavel ?? '').trim(),
+    validade_dias: Number(form.value.validade_dias ?? 7),
+    desconto_percentual: String(descontoPercentual.value ?? 0),
+    observacao: String(form.value.observacao ?? ''),
+    itens: normalizedItems,
   }
 
   saving.value = true
@@ -505,6 +548,7 @@ function openActionDialog() {
 async function performSave(mode: 'orcamento' | 'venda') {
   const payload = {
     cliente_nome: String(form.value.cliente_nome ?? '').trim(),
+     nome_responsavel: String(form.value.nome_responsavel ?? '').trim(),
     validade_dias: Number(form.value.validade_dias ?? 7),
     desconto_percentual: String(descontoPercentual.value ?? 0),
     observacao: String(form.value.observacao ?? ''),
